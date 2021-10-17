@@ -1,0 +1,26 @@
+# control plane node
+hostname: {{ hostname }}
+manage_etc_hosts: true
+users:
+  - name: ops
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+      {%- for key in keys %}
+      - {{ key }}
+      {%- endfor %}
+ssh_pwauth: true
+disable_root: false
+chpasswd:
+  list:
+    - ops:ops
+  expire: false
+
+# package management
+package_update: true
+packages:
+  {%- for package in packages %}
+  - {{ package }}
+  {%- endfor %}
