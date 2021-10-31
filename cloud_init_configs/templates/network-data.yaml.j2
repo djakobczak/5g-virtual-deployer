@@ -1,0 +1,17 @@
+network:
+    version: 2
+    ethernets:
+        {%- for inface in interfaces %}
+        {{ inface.name }}:
+            match:
+                macaddress: {{ inface.mac }}
+            addresses:
+            {%- for addr in inface.addresses %}
+                - {{ addr }}
+            {%- endfor %}
+            dhcp: false
+            gateway4: {{ inface.gateway4 }}
+            nameservers:
+                addresses: {{ inface.dns_servers }}
+            set-name: {{ inface.name }}
+        {%- endfor %}

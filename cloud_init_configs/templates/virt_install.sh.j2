@@ -1,0 +1,14 @@
+virt-install \
+    --connect qemu:///system
+    --virt-type kvm \
+    --name {{ vm_name }} \
+    --ram {{ ram }} \
+    --vcpus={{ vcpus }} \
+    --os-type linux \
+    --os-variant ubuntu20.04 \
+    {%- for disk in disks %}}
+    --disk path={{disk.path}},device=disk \
+    {%- endfor %}
+    --import \
+    --network network=default,model=virtio,mac={{mac}} \
+    --noautoconsole
