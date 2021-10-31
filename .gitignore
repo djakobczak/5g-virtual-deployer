@@ -138,3 +138,4 @@ dmypy.json
 cython_debug/
 
 cloud_init_configs/keys
+cloud_init_configs/configs_generated

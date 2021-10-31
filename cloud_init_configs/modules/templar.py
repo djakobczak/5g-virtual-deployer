@@ -15,7 +15,6 @@ class Templar:
     def render(self, src: str, **jinja_vars) -> Dict[str, Any]:
         template = self.env.get_template(src)
         generated = template.render(**jinja_vars)
-        print(generated)
         return generated
 
     @staticmethod
@@ -60,7 +59,7 @@ class CloudTemplar(Templar):
     ]
 
     MVM_PACKAGES = [
-        'nfs-kernel-server'
+        'nfs-kernel-server',
     ]
 
     MOUNT_NFS = [
@@ -94,8 +93,8 @@ class CloudTemplar(Templar):
     def generate_mvm_config(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
 
-        user_data_vars['packages'] = self.MVM_PACKAGES
-        runcmd = [
+        user_data_vars['packages'] = self.PACKAGES + self.MVM_PACKAGES
+        runcmd_nfs = [
             'mkdir /mnt/nfs_shared',
             'chown -R nobody:nogroup /mnt/nfs_shared',
             'chmod 777 /mnt/nfs_shared',
@@ -103,7 +102,15 @@ class CloudTemplar(Templar):
             'sudo exportfs -a',
             'sudo systemctl restart nfs-kernel-server',
         ]
-        user_data_vars['runcmd'] = runcmd
+        runcmd_build_binaries = [
+            'git clone https://github.com/open5gs/open5gs',
+            'cd open5gs',
+            './misc/netconf.sh',
+            'git checkout v2.3.6',
+            'meson build --prefix=`pwd`/install',
+            'ninja -C build'
+        ]
+        user_data_vars['runcmd'] = runcmd_nfs + runcmd_build_binaries
 
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)

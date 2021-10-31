@@ -77,9 +77,9 @@ cr.create_disk_image(mvm_config['name'], mvm_config['base_img'])
 cr.create_disk_with_nocloud(mvm_config['name'])
 cr.provision_vm(mvm_config['name'], mvm_config['mac'])
 
-cr.create_disk_image(vm01_confg['name'], vm01_confg['base_img'])
-cr.create_disk_with_nocloud(vm01_confg['name'])
-cr.provision_vm(vm01_confg['name'], vm01_confg['mac'])
+# cr.create_disk_image(vm01_confg['name'], vm01_confg['base_img'])
+# cr.create_disk_with_nocloud(vm01_confg['name'])
+# cr.provision_vm(vm01_confg['name'], vm01_confg['mac'])
 
 # cr.create_disk_image(vm02_confg['name'])
 # cr.create_disk_with_nocloud(vm02_confg['name'], vm02_confg['base_img'])
