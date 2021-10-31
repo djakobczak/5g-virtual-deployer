@@ -19,11 +19,18 @@ chpasswd:
   expire: false
 
 package_update: true
-{% if packages %}
+{%- if packages %}
 packages:
   {%- for package in packages %}
   - {{ package }}
   {%- endfor %}
-{% endif %}
+{%- endif %}
+
+{%- if runcmd %}
+runcmd:
+  {%- for cmd in runcmd %}
+  - {{ cmd }}
+  {%- endfor %}
+{%- endif %}
 
 final_message: "The system is finally up, after $UPTIME seconds"

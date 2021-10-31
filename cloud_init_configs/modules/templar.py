@@ -3,16 +3,19 @@ from pathlib import Path
 
 from jinja2 import FileSystemLoader, Environment
 
+from configs import MVM_IP
+
 
 class Templar:
 
     def __init__(self, template_dir: str) -> None:
         template_loader = FileSystemLoader(searchpath=template_dir)
-        self.env = Environment(loader=template_loader, autoescape=True)
+        self.env = Environment(loader=template_loader)
 
     def render(self, src: str, **jinja_vars) -> Dict[str, Any]:
         template = self.env.get_template(src)
         generated = template.render(**jinja_vars)
+        print(generated)
         return generated
 
     @staticmethod
@@ -30,7 +33,39 @@ class CloudTemplar(Templar):
         'python3-pip',
         'python3-setuptools',
         'python3-wheel',
-        'ninja-build'
+        'ninja-build',
+        'build-essential',
+        'flex',
+        'bison',
+        'git',
+        'libsctp-dev',
+        'libgnutls28-dev',
+        'libgcrypt-dev',
+        'libssl-dev',
+        'libidn11-dev',
+        'libmongoc-dev',
+        'libbson-dev',
+        'libyaml-dev',
+        'libnghttp2-dev',
+        'libmicrohttpd-dev',
+        'libcurl4-gnutls-dev',
+        'libnghttp2-dev',
+        'libtins-dev',
+        'meson',
+        'nfs-common'
+    ]
+
+    CPLANE_PACKAGES = [
+        'mongodb'
+    ]
+
+    MVM_PACKAGES = [
+        'nfs-kernel-server'
+    ]
+
+    MOUNT_NFS = [
+        'mkdir -p /nfs/general',
+        f'mount {MVM_IP}:/mnt/nfs_shared /nfs/general'
     ]
 
     def __init__(self,
@@ -45,6 +80,39 @@ class CloudTemplar(Templar):
         self.network_data_fn = network_data_fn
 
     def generate_cplane_node(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        user_data_vars['packages'] += self.CPLANE_PACKAGES
+        user_data_vars['runcmd'] = self.MOUNT_NFS
+
+        user_data = self.render(self.user_data_fn, **user_data_vars)
+        network_data = self.render(self.network_data_fn, **network_data_vars)
+        return {
+            'user_data': user_data,
+            'network_data': network_data
+        }
+
+    def generate_mvm_config(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+
+        user_data_vars['packages'] = self.MVM_PACKAGES
+        runcmd = [
+            'mkdir /mnt/nfs_shared',
+            'chown -R nobody:nogroup /mnt/nfs_shared',
+            'chmod 777 /mnt/nfs_shared',
+            'echo "/mnt/nfs_shared 192.168.122.0/24(rw,sync,no_subtree_check)" >> /etc/exports',
+            'sudo exportfs -a',
+            'sudo systemctl restart nfs-kernel-server',
+        ]
+        user_data_vars['runcmd'] = runcmd
+
+        user_data = self.render(self.user_data_fn, **user_data_vars)
+        network_data = self.render(self.network_data_fn, **network_data_vars)
+        return {
+            'user_data': user_data,
+            'network_data': network_data
+        }
+
+    def _generate_common_config(self, **config):
         with open(self.ssh_key_path, 'r') as key_fd:
             key = key_fd.read()
 
@@ -65,10 +133,4 @@ class CloudTemplar(Templar):
                 }
             ]
         }
-
-        user_data = self.render(self.user_data_fn, **user_data_vars)
-        network_data = self.render(self.network_data_fn, **network_data_vars)
-        return {
-            'user_data': user_data,
-            'network_data': network_data
-        }
+        return user_data_vars, network_data_vars

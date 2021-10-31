@@ -1,7 +1,7 @@
 from pathlib import Path
-from random import randint, seed
+from random import randint
 
-from typing import Any, Dict 
+from typing import Any, Dict
 
 from jinja2 import Template
 from yaml import dump

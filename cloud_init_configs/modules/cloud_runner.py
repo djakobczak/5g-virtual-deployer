@@ -52,9 +52,9 @@ class EnvManager:
             self.vms.append(vm_env)
 
     def clear(self):
+        LOG.info('Clear all vms')
         for path in self._get_vms():
-            print(path)
-            shutil.rmtree(path)
+            shutil.rmtree(path.base_dir)
 
     def print_working_directory(self) -> None:
         # requires tree installed
@@ -78,16 +78,15 @@ class EnvManager:
 class CloudInitManager:
     def __init__(self,
                  env_manager: EnvManager,
-                 base_img: str,
                  disk_format: str = 'qcow2',
                  disk_size: str = '10G') -> None:
         self.env_manager = env_manager
-        self.base_img = self.env_manager.base_images_dir / base_img
         self.disk_format = disk_format
         self.disk_size = disk_size
 
-    def create_disk_image(self, vm_name: str) -> None:
+    def create_disk_image(self, vm_name: str, base_img: str) -> None:
         vmpath = self.env_manager[vm_name]
+        base_img_path = self.env_manager.base_images_dir / base_img
 
         # create disk image with specified size based on base image
         dest_path = vmpath.disk_image
@@ -98,7 +97,7 @@ class CloudInitManager:
         cmd = ['sudo', 'qemu-img', 'create',
                '-f', self.disk_format,
                '-F', self.disk_format,
-               '-b', str(self.base_img),
+               '-b', str(base_img_path),
                str(dest_path) , str(self.disk_size)
         ]
 
