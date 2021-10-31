@@ -29,7 +29,7 @@ def _save_yaml(content: str, dst: str, force: bool = False) -> None:
     dst = Path(dst)
     if force:
         dst.parent.mkdir(parents=True, exist_ok=True)
-    print(content)
+
     with open(dst, 'w+') as out_fd:
         dump(content, out_fd, default_flow_style=False)
 

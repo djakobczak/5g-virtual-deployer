@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import logging
-from os import name
 from pathlib import Path
+import shutil
 import subprocess
 from typing import List
 
@@ -51,14 +51,22 @@ class EnvManager:
         if vm_env not in self.vms:
             self.vms.append(vm_env)
 
+    def clear(self):
+        for path in self._get_vms():
+            print(path)
+            shutil.rmtree(path)
+
     def print_working_directory(self) -> None:
         # requires tree installed
         subprocess.run(['tree', self.working_dir], check=True)
 
+    def _get_vms(self):
+        return [VMPath(self.working_dir, p.name)
+                for p in self.working_dir.iterdir()
+                if p.name != 'base-images']
+
     def _load_vms(self) -> None:
-        self.vms = [VMPath(self.working_dir, p.name)
-                    for p in self.working_dir.iterdir()
-                    if p.name != 'base-images']
+        self.vms = self._get_vms()
 
     def __getitem__(self, name: str):
         try:
@@ -87,7 +95,7 @@ class CloudInitManager:
             LOG.warning(f'File {dest_path} already exists')
             return
 
-        cmd = ['qemu-img', 'create',
+        cmd = ['sudo', 'qemu-img', 'create',
                '-f', self.disk_format,
                '-F', self.disk_format,
                '-b', str(self.base_img),
@@ -104,13 +112,18 @@ class CloudInitManager:
         vmpath = self.env_manager[vm_name]
 
         verbose = '-v' if verbosity else ''
-        net_config = ['--network-config', vmpath.network_data] \
-                     if vmpath.network_data.is_file() else []
-        metadata = [metadata_path] if metadata_path else []
+        net_config = []
+        metadata = [metadata_path] if metadata_path else []  # unused, remove or fix
+
+        # validate cloud configs
+        if vmpath.network_data.is_file():
+            self.validate_cloud_config(vmpath.network_data)
+            net_config = ['--network-config', vmpath.network_data]
+        self.validate_cloud_config(vmpath.user_data)
 
         # cloud-localds [ options ] output user-data [meta-data]
         cmd = [
-            'cloud-localds', verbose,
+            'sudo', 'cloud-localds', verbose,
             *net_config,
             vmpath.nocloud_disk,
             vmpath.user_data,
@@ -136,6 +149,7 @@ class CloudInitManager:
 
         # !TODO extend network definition
         cmd = [
+            'sudo',
             'virt-install',
             '--connect', 'qemu:///system',
             '--virt-type', virt_type,
@@ -150,4 +164,11 @@ class CloudInitManager:
             '--noautoconsole'
         ]
         LOG.debug('Run command: %s', ' '.join(cmd))
-        subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, capture_output=True)
+        if result.stderr:
+            LOG.error(result)
+
+    def validate_cloud_config(self, path: str):
+        subprocess.run(['cloud-init', 'devel', 'schema',
+                        '--config-file', f'{path}'],
+                       check=True)

@@ -25,8 +25,12 @@ class Templar:
 
 
 class CloudTemplar(Templar):
-    CPLANE_PACKAGES = [
-        'python'
+    PACKAGES = [
+        'python3',
+        'python3-pip',
+        'python3-setuptools',
+        'python3-wheel',
+        'ninja-build'
     ]
 
     def __init__(self,
@@ -40,22 +44,22 @@ class CloudTemplar(Templar):
         self.user_data_fn = user_data_fn
         self.network_data_fn = network_data_fn
 
-    def generate_cplane_node(self, name: str, mac: str):
+    def generate_cplane_node(self, **config):
         with open(self.ssh_key_path, 'r') as key_fd:
             key = key_fd.read()
 
         user_data_vars = {
-            'hostname': name,
+            'hostname': config.get('name'),
             'keys': [key],
-            'packages': self.CPLANE_PACKAGES
+            'packages': self.PACKAGES
         }
 
         network_data_vars = {
             'interfaces': [
                 {
                     'name': 'eth01',
-                    'mac': mac,
-                    'addresses': ['192.168.122.100'],
+                    'mac': config.get('mac'),
+                    'addresses': [config.get('ip')],
                     'gateway4': '192.168.122.1',
                     'dns_servers': '8.8.8.8',
                 }

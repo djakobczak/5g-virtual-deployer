@@ -1,4 +1,4 @@
-# control plane node
+#cloud-config
 hostname: {{ hostname }}
 manage_etc_hosts: true
 users:
@@ -18,9 +18,12 @@ chpasswd:
     - ops:ops
   expire: false
 
-# package management
 package_update: true
+{% if packages %}
 packages:
   {%- for package in packages %}
   - {{ package }}
   {%- endfor %}
+{% endif %}
+
+final_message: "The system is finally up, after $UPTIME seconds"
