@@ -39,34 +39,35 @@ class VMPath:
 class EnvManager:
     def __init__(self, working_dir: str) -> None:
         self.working_dir = Path(working_dir)
+        self.vms_dir = Path(working_dir) / 'vms'
         self.base_images_dir = Path(working_dir) / 'base-images'
 
-        self.working_dir.mkdir(parents=True, exist_ok=True)
+        self.vms_dir.mkdir(parents=True, exist_ok=True)
         self.base_images_dir.mkdir(parents=True, exist_ok=True)
-        self.vms = []
-        self._load_vms()
+        self.vms = self._get_vms()
 
     def init_vm_env(self, name: str) -> None:
-        vm_env = VMPath(self.working_dir, name)
-        if vm_env not in self.vms:
-            self.vms.append(vm_env)
+        vm_env = VMPath(self.vms_dir, name)
+        if vm_env in self.vms:
+            raise Exception(f"Env for vm {name} already exists")
+        self.vms.append(vm_env)
 
-    def clear(self):
+    def clear(self, vm_names=None):
         LOG.info('Clear all vms')
         for path in self._get_vms():
-            shutil.rmtree(path.base_dir)
+            if not vm_names or path.vm_name in vm_names:
+                LOG.debug(f'Remove {path.base_dir}')
+                shutil.rmtree(path.base_dir)
+                self.vms.remove(path)
 
     def print_working_directory(self) -> None:
         # requires tree installed
         subprocess.run(['tree', self.working_dir], check=True)
 
     def _get_vms(self):
-        return [VMPath(self.working_dir, p.name)
-                for p in self.working_dir.iterdir()
+        return [VMPath(self.vms_dir, p.name)
+                for p in self.vms_dir.iterdir()
                 if p.name != 'base-images']
-
-    def _load_vms(self) -> None:
-        self.vms = self._get_vms()
 
     def __getitem__(self, name: str):
         try:
@@ -75,17 +76,21 @@ class EnvManager:
             raise LookupError(f'VM with name {name} not initilized by EnvManager')
 
 
-class CloudInitManager:
+class VmManager:
     def __init__(self,
-                 env_manager: EnvManager,
-                 disk_format: str = 'qcow2',
-                 disk_size: str = '10G') -> None:
+                 env_manager: EnvManager
+                 ) -> None:
         self.env_manager = env_manager
-        self.disk_format = disk_format
-        self.disk_size = disk_size
 
-    def create_disk_image(self, vm_name: str, base_img: str) -> None:
+    def create_disk_image(self,
+                          vm_name: str,
+                          base_img: str,
+                          disk_format: str = 'qcow2',
+                          disk_size: str = '10G'
+                          ) -> None:
+        """ Create snapshot from existing disk """
         vmpath = self.env_manager[vm_name]
+        # image to snapshot from (maybe set to optional)
         base_img_path = self.env_manager.base_images_dir / base_img
 
         # create disk image with specified size based on base image
@@ -95,10 +100,11 @@ class CloudInitManager:
             return
 
         cmd = ['sudo', 'qemu-img', 'create',
-               '-f', self.disk_format,
-               '-F', self.disk_format,
+               '-f', disk_format,
+               '-F', disk_format,
                '-b', str(base_img_path),
-               str(dest_path) , str(self.disk_size)
+               str(dest_path) ,
+               str(disk_size)
         ]
 
         LOG.debug('Run command: %s', cmd)
@@ -171,3 +177,18 @@ class CloudInitManager:
         subprocess.run(['cloud-init', 'devel', 'schema',
                         '--config-file', f'{path}'],
                        check=True)
+
+    def destroy_vms(self, *vm_names: List[str], all=False) -> None:
+        virsh_out = subprocess.run(
+            ['virsh', 'list', '--all', '--name'],
+            check=True, capture_output=True, text=True)
+        running_vm = virsh_out.stdout.strip().split()
+        if all:
+            vm_names = running_vm
+
+        for vm_name in vm_names:
+            if vm_name not in running_vm:
+                LOG.warning(f"VM {vm_name} is not running")
+                continue
+            subprocess.run(['virsh', 'undefine', vm_name])
+            subprocess.run(['virsh', 'destroy', vm_name])

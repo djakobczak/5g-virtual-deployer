@@ -1,0 +1,23 @@
+# control plane node
+hostname: cplane01
+manage_etc_hosts: true
+users:
+  - name: ops
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDaawbYpyQAGRw1QnWrGOPDqMxaOySHXNXUu1YWPASEgql9SOXbMF6qDkOGFwRzcGBg5NCGUcqZeHsWVrdTu4RHcqm6pYinKf7vZck8RGLvawnMffi7AUjhvH+j+DIzQeTj/RTr1wkO+2cdl38TGl5ccajNtkqbBNbBsJ1hPzMPPPs01+5nsHn6i+8WAKFVP2qqdJY37QjeJbzI46xtGbPd5rAHbKqSl4JUkorxuZXbvjfYRf1n7HOmauLyAoDZrxKMSV+fVV8NvgeAhg/LfFPT5XzhM8eJhlUkmswlorjK4X7AiRhlE9O1WBMmMVwfIazEGpF0scK/9jogd+FtYiSCy8BJUJ4xpc9Wy9phG9jtD6Cj1JQsmfKrFO2RR/W4qyQJLokq0qYtxRZ8fAH60gaQe3N5TWFM0pjiCPvaW/l4DWSmP1b2ns2m2olMoMkWSDclxR4gREmUFKwwobDBwXX80qBrZfShN9XEQeId7BYZOGQP5fEgBaYAKkM4GmR9fTdEopzHewuN3hEaBYJlxETzPHZj2A8dhGgq54ySjPP81x0IHi1pdHj/9UZfa3C/9lVV9xYfFC764C7S0/gfUH+23tAUh5baEuow5vOW6+CfjUGrLDndz6Ax5lKfAN6vA6e4KtvVeiCH9AFOGCcMalc6MJv0ZodJSU0Tqih4yV76Q== hypervisor
+
+ssh_pwauth: true
+disable_root: false
+chpasswd:
+  list:
+    - ops:ops
+  expire: false
+
+# package management
+package_update: true
+packages:
+  - python3

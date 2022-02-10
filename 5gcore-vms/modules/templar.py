@@ -43,6 +43,7 @@ class CloudTemplar(Templar):
         'libssl-dev',
         'libidn11-dev',
         'libmongoc-dev',
+        'libtalloc-dev',
         'libbson-dev',
         'libyaml-dev',
         'libnghttp2-dev',
@@ -50,8 +51,7 @@ class CloudTemplar(Templar):
         'libcurl4-gnutls-dev',
         'libnghttp2-dev',
         'libtins-dev',
-        'meson',
-        'nfs-common'
+        'meson'
     ]
 
     CPLANE_PACKAGES = [
@@ -63,8 +63,26 @@ class CloudTemplar(Templar):
     ]
 
     MOUNT_NFS = [
-        'mkdir -p /nfs/general',
-        f'mount {MVM_IP}:/mnt/nfs_shared /nfs/general'
+        'mkdir -p /mnt/nfs_shared',
+        f'mount {MVM_IP}:/mnt/nfs_shared /mnt/nfs_shared'
+    ]
+
+    BUILD_5GCORE = [
+        'git clone https://github.com/open5gs/open5gs',
+        'cd open5gs',
+        'git checkout v2.4.4',
+        './misc/netconf.sh',
+        'meson build --prefix="${PWD}/install"',
+        'ninja -C build',
+        'cd build; ninja install; cd ..',
+    ]
+
+    POST_BUILD = [
+        'cd /open5gs/',
+        'ln -s ${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp/dict_dcca_3gpp.fdx '
+            '${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp.fdx',
+        'cp install/bin/open5gs-* /usr/bin/',
+        'chmod -R 755 /open5gs/'
     ]
 
     def __init__(self,
@@ -81,7 +99,7 @@ class CloudTemplar(Templar):
     def generate_cplane_node(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['packages'] += self.CPLANE_PACKAGES
-        user_data_vars['runcmd'] = self.MOUNT_NFS
+        user_data_vars['runcmd'] = self.BUILD_5GCORE + self.POST_BUILD
 
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)
@@ -102,13 +120,20 @@ class CloudTemplar(Templar):
             'sudo exportfs -a',
             'sudo systemctl restart nfs-kernel-server',
         ]
+
         runcmd_build_binaries = [
+            'cd /mnt/nfs_shared',
             'git clone https://github.com/open5gs/open5gs',
             'cd open5gs',
-            './misc/netconf.sh',
             'git checkout v2.3.6',
-            'meson build --prefix=`pwd`/install',
-            'ninja -C build'
+            './misc/netconf.sh',
+            'meson build --prefix="/home/ops/open5gs/install"',
+            'ninja -C build',
+            'cd build; ninja install; cd ..'
+            'chmod -R 777 /mnt/nfs_shared/open5gs/build',
+            'chmod 777 /mnt/nfs_shared/open5gs/',
+            'ln -s /mnt/nfs_shared/open5gs/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp/dict_dcca_3gpp.fdx '
+            '/mnt/nfs_shared/open5gs/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp.fdx',
         ]
         user_data_vars['runcmd'] = runcmd_nfs + runcmd_build_binaries
 
@@ -124,7 +149,7 @@ class CloudTemplar(Templar):
             key = key_fd.read()
 
         user_data_vars = {
-            'hostname': config.get('name'),
+            'hostname': config['name'],
             'keys': [key],
             'packages': self.PACKAGES
         }
@@ -133,8 +158,8 @@ class CloudTemplar(Templar):
             'interfaces': [
                 {
                     'name': 'eth01',
-                    'mac': config.get('mac'),
-                    'addresses': [config.get('ip')],
+                    'mac': config['mac'],
+                    'addresses': [config['ip']],
                     'gateway4': '192.168.122.1',
                     'dns_servers': '8.8.8.8',
                 }
