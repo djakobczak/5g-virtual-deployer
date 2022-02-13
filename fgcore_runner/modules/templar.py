@@ -75,15 +75,14 @@ class CloudTemplar(Templar):
         'meson build --prefix="${PWD}/install"',
         'ninja -C build',
         'cd build; ninja install; cd ..',
-    ]
-
-    POST_BUILD = [
         'cd /open5gs/',
         'ln -s ${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp/dict_dcca_3gpp.fdx '
             '${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp.fdx',
         'cp install/bin/open5gs-* /usr/bin/',
-        'chmod -R 755 /open5gs/'
+        'chmod -R 755 /open5gs/',
     ]
+
+    RESET_CLOUD_INIT = ['cloud-init clean']
 
     def __init__(self,
                  template_dir: str,
@@ -96,10 +95,21 @@ class CloudTemplar(Templar):
         self.user_data_fn = user_data_fn
         self.network_data_fn = network_data_fn
 
-    def generate_cplane_node(self, **config):
+    def generate_cplane_node_base(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['packages'] += self.CPLANE_PACKAGES
-        user_data_vars['runcmd'] = self.BUILD_5GCORE + self.POST_BUILD
+        user_data_vars['runcmd'] = self.BUILD_5GCORE + self.RESET_CLOUD_INIT
+
+        user_data = self.render(self.user_data_fn, **user_data_vars)
+        network_data = self.render(self.network_data_fn, **network_data_vars)
+        return {
+            'user_data': user_data,
+            'network_data': network_data
+        }
+
+    def generate_cplane_node(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        user_data_vars['runcmd'] = ['echo OK']
 
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)

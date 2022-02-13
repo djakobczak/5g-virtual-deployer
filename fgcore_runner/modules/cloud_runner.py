@@ -69,6 +69,12 @@ class EnvManager:
                 for p in self.vms_dir.iterdir()
                 if p.name != 'base-images']
 
+    def get_vm_names(self) -> List[str]:
+        return [vm_path.vm_name for vm_path in self._get_vms()]
+
+    def is_vm_initialized(self, vm_name: str) -> bool:
+        return vm_name in self.get_vm_names()
+
     def __getitem__(self, name: str):
         try:
             return next(vmpath for vmpath in self.vms if vmpath.vm_name == name)
@@ -82,28 +88,41 @@ class VmManager:
                  ) -> None:
         self.env_manager = env_manager
 
-    def create_disk_image(self,
-                          vm_name: str,
-                          base_img: str,
-                          disk_format: str = 'qcow2',
-                          disk_size: str = '10G'
-                          ) -> None:
-        """ Create snapshot from existing disk """
-        vmpath = self.env_manager[vm_name]
-        # image to snapshot from (maybe set to optional)
-        base_img_path = self.env_manager.base_images_dir / base_img
+    def create_vm_disk(self,
+                       vm_name: str,
+                       src_img_or_vm: str,
+                       disk_format: str = 'qcow2',
+                       disk_size: str = '10G',
+                       **kwargs) -> None:
+        if self.env_manager.is_vm_initialized(src_img_or_vm):
+            src_img_or_vm = self.env_manager[src_img_or_vm].disk_image
 
-        # create disk image with specified size based on base image
-        dest_path = vmpath.disk_image
-        if dest_path.is_file():
-            LOG.warning(f'File {dest_path} already exists')
-            return
+        vm_disk_image = self.env_manager[vm_name].disk_image
+        self.create_disk_snapshot(vm_disk_image, src_img_or_vm,
+                                  disk_format, disk_size, **kwargs)
 
+    def create_disk_snapshot(self,
+                        dest_img_name: str,
+                        base_img_name: str,
+                        disk_format: str = 'qcow2',
+                        disk_size: str = '10G',
+                        **kwargs) -> None:
+        """ Create snapshot from existing disk (COW) """
+        base_img_path = self.env_manager.base_images_dir / base_img_name
+        dest_img_path = self.env_manager.base_images_dir / dest_img_name
+
+        if not base_img_path.is_file():
+            raise FileNotFoundError(f"Base image ({base_img_path}) not found")
+
+        if dest_img_path.is_file() and not kwargs.get("force"):
+            raise FileExistsError(f"Destition image already exist ({dest_img_path})")
+
+        # create disk image with specified size based on base image (COW)
         cmd = ['sudo', 'qemu-img', 'create',
                '-f', disk_format,
                '-F', disk_format,
                '-b', str(base_img_path),
-               str(dest_path) ,
+               str(dest_img_path) ,
                str(disk_size)
         ]
 

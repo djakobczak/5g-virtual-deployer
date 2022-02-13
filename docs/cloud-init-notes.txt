@@ -1,0 +1,2 @@
+cloud-init clean - removes artifacts from /var/lib/cloud to simulate clean instance. cloud-init will be run on first reboot.
+* -r flag to reboot 
