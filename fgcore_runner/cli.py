@@ -1,7 +1,8 @@
 import logging
 import click
 
-from fgcore_runner.env  import commands as env_group
+from fgcore_runner.environment  import commands as env_group
+from fgcore_runner.images  import commands as images_group
 
 
 LOGGER_FORMAT = '%(name)s - %(levelname)s - %(asctime)s - %(message)s'
@@ -14,6 +15,7 @@ def fgc():
 
 
 fgc.add_command(env_group.env)
+fgc.add_command(images_group.images)
 
 
 if __name__ == "__main__":

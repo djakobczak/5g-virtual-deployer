@@ -137,5 +137,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-cloud_init_configs/keys
-cloud_init_configs/configs_generated
+fgcore_runner/keys
+fgcore_runner/configs_generated
+keys
