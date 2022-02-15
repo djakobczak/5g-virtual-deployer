@@ -5,8 +5,14 @@ import shutil
 import subprocess
 from typing import List
 
+from fgcore_runner.utils import generate_mac
+
 
 LOG = logging.getLogger(__name__)
+
+VM_TYPE_BUILDER = 'builder'
+VM_TYPE_CORE = 'cplane'
+VM_TYPE_UPF = 'upf'
 
 
 @dataclass
@@ -44,17 +50,17 @@ class EnvManager:
 
         self.vms_dir.mkdir(parents=True, exist_ok=True)
         self.base_images_dir.mkdir(parents=True, exist_ok=True)
-        self.vms = self._get_vms()
+        self.vms = self.get_vms()
 
-    def init_vm_env(self, name: str) -> None:
-        vm_env = VMPath(self.vms_dir, name)
+    def init_vm_env(self, name: str, vm_type: str = VM_TYPE_CORE) -> None:
+        vm_env = VMPath(self.vms_dir, f"{name}-{vm_type}")
         if vm_env in self.vms:
             raise Exception(f"Env for vm {name} already exists")
         self.vms.append(vm_env)
 
     def clear(self, vm_names=None):
         LOG.info('Clear all vms')
-        for path in self._get_vms():
+        for path in self.get_vms():
             if not vm_names or path.vm_name in vm_names:
                 LOG.debug(f'Remove {path.base_dir}')
                 shutil.rmtree(path.base_dir)
@@ -64,13 +70,17 @@ class EnvManager:
         # requires tree installed
         subprocess.run(['tree', self.working_dir], check=True)
 
-    def _get_vms(self):
+    def get_vms(self) -> List[VMPath]:
         return [VMPath(self.vms_dir, p.name)
                 for p in self.vms_dir.iterdir()
                 if p.name != 'base-images']
 
     def get_vm_names(self) -> List[str]:
-        return [vm_path.vm_name for vm_path in self._get_vms()]
+        return [vm_path.vm_name for vm_path in self.get_vms()]
+
+    def get_core_vm_names(self) -> List[str]:
+        return [vm_path.vm_name for vm_path in self.get_vms()
+                if VM_TYPE_BUILDER not in vm_path.vm_name]
 
     def is_vm_initialized(self, vm_name: str) -> bool:
         return vm_name in self.get_vm_names()
@@ -156,15 +166,21 @@ class VmManager:
         LOG.debug('Run command: %s', cmd)
         subprocess.run(cmd, check=True)
 
+    def verify_if_vm_can_be_created(self, vm_name: str):
+        pass
+
     def provision_vm(self,
                      vm_name: str,
-                     mac: str,
+                     mac: str = None,
                      ram: str = '2048',
                      vcpus: str = '2',
                      os_variant: str = 'ubuntu20.04',
                      virt_type: str = 'kvm',
                      os_type: str = 'linux'):
         vmpath = self.env_manager[vm_name]
+
+        if not mac:
+            mac = generate_mac()
 
         disks_def = []
         for dpath in vmpath.disk_paths:

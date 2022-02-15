@@ -6,17 +6,13 @@ import click
 
 from fgcore_runner.modules.env import EnvManager
 from fgcore_runner.modules.templar import CloudTemplar
+from fgcore_runner.utils import generate_mac
 
 
 TEMPLATES_DIR = Path(Path(__file__).resolve().parent.parent, 'templates')
 WORKING_DIR = str(Path.home() / '5gcore-vms-wd')
 
 LOG = logging.getLogger(__name__)
-
-
-def generate_mac():
-    r255 = lambda: randint(16, 255)
-    return f'52:54:00:{r255():x}:{r255():x}:{r255():x}'
 
 
 @click.group()
@@ -52,6 +48,20 @@ def add_vm(ctx, **kwargs):
     vmpath = env[config['name']]
     templar.save(cloud_configs['user_data'], vmpath.user_data)
     templar.save(cloud_configs['network_data'], vmpath.network_data)
+
+
+@env.command()
+@click.pass_context
+@click.argument("name")
+def remove(ctx, **kwargs):
+    """ Remove vm """
+    env = ctx.obj['env']
+    vms = kwargs.get("vm")
+    vm_name = kwargs.get("name")
+    confirmation = click.confirm(f'This command will remove vm ({vm_name}), '
+                                 'do you want to continue?')
+    if confirmation:
+        env.remove_vm(vm_name)
 
 
 @env.command()
