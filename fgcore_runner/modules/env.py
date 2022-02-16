@@ -5,6 +5,8 @@ import shutil
 import subprocess
 from typing import List
 
+from fgcore_runner.utils import read_yaml
+
 
 LOG = logging.getLogger(__name__)
 
@@ -32,9 +34,36 @@ class VMPath:
         self.nocloud_disk = self.images_dir / f'{self.vm_name}-nocloud.qcow2'
         self.disk_paths = [self.disk_image, self.nocloud_disk]
 
+    def init_paths(self):
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.images_dir.mkdir(parents=True, exist_ok=True)
 
+
+class VMConfig:
+    def __init__(self, vmpath: VMPath) -> None:
+        self.vmpath = vmpath
+
+    @property
+    def network_data(self) -> dict:
+        return read_yaml(self.vmpath.network_data)
+
+    @property
+    def user_data(self) -> dict:
+        return read_yaml(self.vmpath.user_data)
+
+    @property
+    def interfaces(self) -> List[dict]:
+        net_config = self.network_data['ethernets']
+        ifaces = [
+            {
+                'mac': iface_def['match']['macaddress'],
+                'ips': iface_def['addresses'],
+                'gw': iface_def['gateway4'],
+                'name': eth_name
+            }
+            for eth_name, iface_def in net_config.items()
+        ]
+        return ifaces
 
 class EnvManager:
     def __init__(self, working_dir: str) -> None:
@@ -47,10 +76,11 @@ class EnvManager:
         self.vms = self.get_vms()
 
     def add_vm(self, name: str) -> None:
-        vm_env = VMPath(self.vms_dir, name)
-        if vm_env in self.vms:
+        vm_path = VMPath(self.vms_dir, name)
+        if vm_path in self.vms:
             raise Exception(f"Env for vm {name} already exists")
-        self.vms.append(vm_env)
+        vm_path.init_paths()
+        self.vms.append(vm_path)
 
     def remove_vm(self, name: str) -> None:
         vm_path = VMPath(self.vms_dir, name)

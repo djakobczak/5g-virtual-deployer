@@ -214,16 +214,35 @@ class VmManager:
                        check=True)
 
     def destroy_vms(self, *vm_names: List[str], all=False) -> None:
+        created_vm = self.get_vms_created()
+        running_vms = self.get_vms_running()
+        if all:
+            vm_names = created_vm
+
+        for vm_name in vm_names:
+            if vm_name not in created_vm:
+                LOG.warning(f"VM {vm_name} is not created")
+                continue
+            subprocess.run(['virsh', 'undefine', vm_name])
+
+            if vm_name not in running_vms:
+                LOG.warning(f"VM {vm_name} is not running")
+                continue
+            subprocess.run(['virsh', 'destroy', vm_name])
+
+    def get_vms_created(self) -> List[str]:
         virsh_out = subprocess.run(
             ['virsh', 'list', '--all', '--name'],
             check=True, capture_output=True, text=True)
-        running_vm = virsh_out.stdout.strip().split()
-        if all:
-            vm_names = running_vm
+        created_vms = virsh_out.stdout.strip().split()
+        return created_vms
 
-        for vm_name in vm_names:
-            if vm_name not in running_vm:
-                LOG.warning(f"VM {vm_name} is not running")
-                continue
-            subprocess.run(['virsh', 'undefine', vm_name])
-            subprocess.run(['virsh', 'destroy', vm_name])
+    def get_vms_running(self) -> List[str]:
+        virsh_out = subprocess.run(
+            ['virsh', 'list', '--name'],
+            check=True, capture_output=True, text=True)
+        running_vms = virsh_out.stdout.strip().split()
+        return running_vms
+
+    def is_vm_created(self, name: str) -> bool:
+        return name in self.get_vms_created()
