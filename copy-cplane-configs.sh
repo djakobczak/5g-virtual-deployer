@@ -1,3 +1,4 @@
+#!/bin/bash
 set -ux
 
 USERNAME=${1-"ops"}

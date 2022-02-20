@@ -19,6 +19,7 @@ class VMPath:
     config_dir: Path = field(init=False)
     user_data: Path = field(init=False)
     network_data: Path = field(init=False)
+    metadata: Path = field(init=False)
     images_dir: Path = field(init=False)
     disk_image: Path = field(init=False)
     nocloud_disk: Path = field(init=False)
@@ -30,6 +31,7 @@ class VMPath:
         self.images_dir = self.base_dir / 'images'
         self.user_data = self.config_dir / 'user-data.yaml'
         self.network_data = self.config_dir / 'network-data.yaml'
+        self.metadata = self.config_dir / 'metadata.yaml'
         self.disk_image = self.images_dir / f'{self.vm_name}.qcow2'
         self.nocloud_disk = self.images_dir / f'{self.vm_name}-nocloud.qcow2'
         self.disk_paths = [self.disk_image, self.nocloud_disk]

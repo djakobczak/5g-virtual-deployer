@@ -65,6 +65,7 @@ def add(ctx, **kwargs):
     vmpath = env[config['name']]
     templar.save(cloud_configs['user_data'], vmpath.user_data)
     templar.save(cloud_configs['network_data'], vmpath.network_data)
+    templar.save({'vm-type': vm_type}, vmpath.metadata)
     LOG.info("VM env initialized")
 
 
