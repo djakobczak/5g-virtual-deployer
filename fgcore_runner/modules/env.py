@@ -70,9 +70,11 @@ class EnvManager:
         self.working_dir = Path(working_dir)
         self.vms_dir = Path(working_dir) / 'vms'
         self.base_images_dir = Path(working_dir) / 'base-images'
+        self.nf_configs_dir = Path(working_dir) / 'nf_configs'
 
         self.vms_dir.mkdir(parents=True, exist_ok=True)
         self.base_images_dir.mkdir(parents=True, exist_ok=True)
+        self.nf_configs_dir.mkdir(parents=True, exist_ok=True)
         self.vms = self.get_vms()
 
     def add_vm(self, name: str) -> None:

@@ -1,0 +1,45 @@
+logger:
+    file: @localstatedir@/log/open5gs/smf.log
+
+smf:
+    sbi:
+      - addr: {{ smf.sbi_ip }}
+        port: 7777
+    pfcp:
+      - addr: {{ smf.pfcp_ip }}
+      - addr: ::1
+    gtpc:
+      - addr: {{ smf.gtpc_ip }}
+      - addr: ::1
+    gtpu:
+      - addr: {{ smf.gtpu_ip }}
+      - addr: ::1
+    subnet:
+      - addr: 10.45.0.1/16
+      - addr: 2001:db8:cafe::1/48
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 2001:4860:4860::8888
+      - 2001:4860:4860::8844
+    mtu: 1400
+    freeDiameter: @sysconfdir@/freeDiameter/smf.conf
+
+nrf:
+    sbi:
+      - addr:
+          - {{ nrf.sbi_ip }}
+          - ::1
+        port: 7777
+
+upf:
+    pfcp:
+      - addr: 127.0.0.7
+
+parameter:
+
+max:
+
+pool:
+
+time:

@@ -1,0 +1,24 @@
+logger:
+    file: @localstatedir@/log/open5gs/upf.log
+
+upf:
+    pfcp:
+      - addr: {{ upf.pfcp_ip }}
+    gtpu:
+      - addr: {{ upf.gtpu_ip }}
+    subnet:
+      {% for net in upf.nets %}}
+      - addr: {{ net.ip }}
+        dnn: {{ net.dnn }}
+        dev: {{ net.dev }}
+      {% endfor %}
+
+smf:
+
+parameter:
+
+max:
+
+pool:
+
+time:

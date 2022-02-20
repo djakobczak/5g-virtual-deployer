@@ -1,0 +1,23 @@
+db_uri: mongodb://localhost/open5gs
+
+logger:
+    file: @localstatedir@/log/open5gs/udr.log
+udr:
+    sbi:
+      - addr: {{ udr.sbi_ip }}
+        port: 7777
+
+nrf:
+    sbi:
+      - addr:
+          - {{ nrf.sbi_ip }}
+          - ::1
+        port: 7777
+
+parameter:
+
+max:
+
+pool:
+
+time:

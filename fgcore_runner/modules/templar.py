@@ -1,3 +1,6 @@
+from dataclasses import dataclass, field
+import ipaddress
+import logging
 from typing import Dict, Any, List
 from pathlib import Path
 
@@ -5,6 +8,8 @@ from jinja2 import FileSystemLoader, Environment
 
 from configs import MVM_IP
 
+
+LOG = logging.getLogger(__name__)
 
 class Templar:
 
@@ -176,3 +181,103 @@ class CloudTemplar(Templar):
             ]
         }
         return user_data_vars, network_data_vars
+
+
+MAX_UPFS = 10
+
+@dataclass
+class CoreIpSchema:
+    sbi_net: ipaddress.IPv4Network
+    ext_net: ipaddress.IPv4Network
+    amf_sbi: ipaddress.IPv4Address = field(init=False)
+    amf_ngap: ipaddress.IPv4Address = field(init=False)
+    ausf_sbi: ipaddress.IPv4Address = field(init=False)
+    bsf_sbi: ipaddress.IPv4Address = field(init=False)
+    nrf_sbi: ipaddress.IPv4Address = field(init=False)
+    nssf_sbi: ipaddress.IPv4Address = field(init=False)
+    pcf_sbi: ipaddress.IPv4Address = field(init=False)
+    smf_sbi: ipaddress.IPv4Address = field(init=False)
+    udm_sbi: ipaddress.IPv4Address = field(init=False)
+    udr_sbi: ipaddress.IPv4Address = field(init=False)
+    upfs: List[ipaddress.IPv4Address] = field(init=False)
+    gnodeb: ipaddress.IPv4Address = field(init=False)
+    ues: List[ipaddress.IPv4Address] = field(init=False)
+
+    def __post_init__(self):
+        self.ext_ip = self.ext_net[10]  # !TODO cplane all in one vm
+        self.amf_sbi = self.sbi_net[10]
+        self.amf_ngap = self.ext_ip
+        self.ausf_sbi = self.sbi_net[11]
+        self.bsf_sbi = self.sbi_net[12]
+        self.nrf_sbi = self.sbi_net[13]
+        self.pcf_sbi = self.sbi_net[14]
+        self.pcrf_sbi = self.sbi_net[15]
+        self.smf_sbi = self.sbi_net[16]
+        self.smf_gtpc = self.sbi_net[16]
+        self.smf_gtpu = self.sbi_net[16]
+        self.smf_pfcp = self.ext_ip
+        self.udm_sbi = self.sbi_net[17]
+        self.udr_sbi = self.sbi_net[18]
+        self.udm_sbi = self.sbi_net[19]
+        self.nssf_sbi = self.sbi_net[20]
+        self.upfs = [self.ext_net[100 + n]
+                     for n in range(MAX_UPFS)]
+
+    def get_dict(self):
+        return {
+            'amf': {
+                'sbi_ip': self.amf_sbi,
+                'ngap_ip': self.amf_ngap
+            },
+            'ausf': { 'sbi_ip': self.ausf_sbi },
+            'bsf': { 'sbi_ip': self.bsf_sbi },
+            'nrf': { 'sbi_ip': self.nrf_sbi },
+            'nssf': { 'sbi_ip': self.nssf_sbi },
+            'pcf': { 'sbi_ip': self.pcf_sbi },
+            'pcrf': { 'sbi_ip': self.pcrf_sbi },
+            'smf': {
+                'sbi_ip': self.smf_sbi,
+                'pfcp_ip': self.smf_pfcp,
+                'gtpc_ip': self.smf_gtpc,
+                'gtpu_ip': self.smf_gtpu,
+            },
+            'udm': { 'sbi_ip': self.udm_sbi },
+            'udr': { 'sbi_ip': self.udr_sbi },
+            'ausf': { 'sbi_ip': self.ausf_sbi },
+            'upfs': {
+                # !TODO
+            }
+        }
+
+class NfTemplar(Templar):
+    SERVICES = [
+        'amf', 'ausf', 'bsf', 'nrf', 'nssf',
+        'pcf', 'pcrf', 'smf', 'udm', 'udr', 'upf',
+        'gnodeb', 'ue'
+    ]
+
+    def __init__(self, nfs_templates_dir: str) -> None:
+        super().__init__(nfs_templates_dir)
+        self.nfs_templates_dir = nfs_templates_dir
+
+    def generate(self, ip_schema: CoreIpSchema):
+        templates = {}
+        for service in self.SERVICES:
+            if service in ['upf', 'gnodeb', 'ue']:
+                continue  # !TODO
+            jinja_vars = ip_schema.get_dict()
+            nf_config = self.render(f'{service}.yaml.j2', **jinja_vars)
+            LOG.debug(f"Config for service {service} generated")
+            templates[service] = nf_config
+        return templates
+
+
+if __name__ == "__main__":
+    TEMPLATES_DIR = Path(Path(__file__).resolve().parent.parent, 'templates', 'nf_configs')
+    LOGGER_FORMAT = '%(name)s - %(levelname)s - %(asctime)s - %(message)s'
+
+    logging.basicConfig(format=LOGGER_FORMAT, datefmt='%I:%M:%S %p', level=logging.DEBUG)
+
+    ipschema = CoreIpSchema(ipaddress.IPv4Network('127.0.0.0/24'), ipaddress.IPv4Network('192.168.122.0/24'), 2)
+    nft = NfTemplar(TEMPLATES_DIR)
+    templates = nft.generate(ipschema)
