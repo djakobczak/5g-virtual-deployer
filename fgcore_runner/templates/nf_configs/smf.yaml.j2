@@ -1,5 +1,5 @@
 logger:
-    file: @localstatedir@/log/open5gs/smf.log
+    file: /open5gs/install/var/log/open5gs/smf.log
 
 smf:
     sbi:
@@ -7,23 +7,24 @@ smf:
         port: 7777
     pfcp:
       - addr: {{ smf.pfcp_ip }}
-      - addr: ::1
     gtpc:
       - addr: {{ smf.gtpc_ip }}
-      - addr: ::1
     gtpu:
       - addr: {{ smf.gtpu_ip }}
-      - addr: ::1
     subnet:
-      - addr: 10.45.0.1/16
-      - addr: 2001:db8:cafe::1/48
+      {%- for upf in upfs %}
+      {%- for net in upf.nets %}
+      - addr: {{ net.ip }}
+        dnn: {{ net.dnn }}
+      {%- endfor %}
+      {%- endfor %}
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 2001:4860:4860::8888
       - 2001:4860:4860::8844
     mtu: 1400
-    freeDiameter: @sysconfdir@/freeDiameter/smf.conf
+    freeDiameter: /open5gs/install/etc/freeDiameter/smf.conf
 
 nrf:
     sbi:
@@ -34,7 +35,10 @@ nrf:
 
 upf:
     pfcp:
-      - addr: 127.0.0.7
+      {%- for upf in upfs %}
+      - addr: {{ upf.pfcp_ip }}
+        dnn: {{ upf.nets | selectattr('dnn') | map(attribute='dnn') | list }}
+      {%- endfor %}
 
 parameter:
 

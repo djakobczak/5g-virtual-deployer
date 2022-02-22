@@ -1,11 +1,13 @@
 from email.policy import default
+from importlib.metadata import metadata
 import ipaddress
 import logging
 from pathlib import Path
+from typing import List
 
 import click
 
-from fgcore_runner.modules.env import EnvManager
+from fgcore_runner.modules.env import VM_TYPE_CORE, VM_TYPE_UPF, EnvManager, VMConfig
 from fgcore_runner.modules.templar import CloudTemplar, CoreIpSchema, NfTemplar
 from fgcore_runner.utils import generate_mac
 
@@ -37,36 +39,70 @@ def env(ctx, **kwargs):
 @env.command()
 @click.pass_context
 @click.argument("name")
-# @click.option("--host_ip_part", type=click.IntRange(min=2, max=254), required=True,
-#               help="Host part (X) of network 192.168.122.X")
-@click.option("--type", type=click.Choice(["cplane", "uplane", "gnodeb", "ue"]),
+@click.option("--type", type=click.Choice(["cplane", "upf", "gnodeb", "ue"]),
               default="cplane")
+@click.option("--upf-idx", type=click.INT, help="Used to determine upf number, starts from 0 [UPF only]")
+@click.option("--tunnel", type=click.STRING, multiple=True,
+              help="Tun interface definition in <dev,cidr,dnn> format e.g. ogstun,10.45.0.1/16,internet",
+              default=['ogstun1,10.45.0.1/16,internet1', 'ogstun2,10.45.0.2/16,internet2'])
 def add(ctx, **kwargs):
     """ Add vm to environment """
     env = ctx.obj["env"]
     templar = ctx.obj["templar"]
     name = kwargs.get("name")
     vm_type = kwargs.get('type')
+    upf_idx = kwargs.get('upf_idx')
+    tunnels = kwargs.get('tunnel')
+
     ipschema = CoreIpSchema(sbi_net= ctx.obj["sbi_net"],
                             ext_net=ctx.obj['ext_net'])
 
-    if vm_type == 'cplane':
-        ip = ipschema.ext_ip
-    else:
-        raise NotImplementedError(f"Type {vm_type} not supported yet")
+    ip = _get_ip_based_on_type(vm_type, ipschema, upf_idx)
 
-    env.add_vm(name)
+    env.init_vm_env(name)
+    tunnels_config = _parse_tunnels_opt(tunnels)
     config = {
         "name": name,
-        "mac": generate_mac(),  # !TODO !!! save MAC and set it in provision_vm (save config in dir structure)
+        "mac": generate_mac(),
         "ip": ip,
+        "tunnels": tunnels_config
     }
-    cloud_configs = templar.generate_cplane_node(**config)
+    if vm_type == VM_TYPE_CORE:
+        cloud_configs = templar.generate_cplane_node(**config)
+    elif vm_type == VM_TYPE_UPF:
+        cloud_configs = templar.generate_upf_node(**config)
+
+    metadata_def = {
+        'vm-type': vm_type,
+        'tunnels': tunnels_config,
+        'upf-idx': upf_idx
+    }
     vmpath = env[config['name']]
     templar.save(cloud_configs['user_data'], vmpath.user_data)
     templar.save(cloud_configs['network_data'], vmpath.network_data)
-    templar.save({'vm-type': vm_type}, vmpath.metadata)
-    LOG.info("VM env initialized")
+    templar.save_yaml(metadata_def, vmpath.metadata)
+    LOG.info(f"VM ({name}, {vm_type}) env initialized")
+
+def _get_ip_based_on_type(vm_type, ipschema, upf_idx=None) -> ipaddress.IPv4Address:
+    if vm_type == VM_TYPE_CORE:
+        ip = ipschema.ext_ip
+    elif vm_type == VM_TYPE_UPF:
+        if upf_idx is None:
+            raise Exception("Vm type upf requires upf-idx")
+        ip = ipschema.upfs[upf_idx]
+    else:
+        raise NotImplementedError(f"Type {vm_type} not supported yet")
+    return ip
+
+def _parse_tunnels_opt(tunnels) -> List[dict]:
+    return [
+        {
+            'dev': tun_tuple[0],
+            'ip': tun_tuple[1],
+            'dnn': tun_tuple[2]
+        }
+        for tun_tuple in map(lambda tun_def: tun_def.split(','), tunnels)
+    ]
 
 
 @env.command()
@@ -75,7 +111,6 @@ def add(ctx, **kwargs):
 def remove(ctx, **kwargs):
     """ Remove vm """
     env = ctx.obj['env']
-    vms = kwargs.get("vm")
     vm_name = kwargs.get("name")
     confirmation = click.confirm(f'This command will remove vm ({vm_name}), '
                                  'do you want to continue?')
@@ -122,8 +157,25 @@ def generate(ctx, **kwargs):
 
     ipschema = CoreIpSchema(sbi_net= ctx.obj["sbi_net"],
                             ext_net=ctx.obj['ext_net'])
-    configs = templar.generate(ipschema)
+    extra_vars = _get_vm_tunnels(env)
+    LOG.debug(f"Found tunnels: {extra_vars}")
+
+    configs = templar.generate(ipschema, **extra_vars)
     for service_name, config in configs.items():
         path = Path(env.nf_configs_dir, f'{service_name}.yml')
         templar.save(config, path)
     LOG.info(f"All configs saved at {env.nf_configs_dir}")
+
+
+def _get_vm_tunnels(env) -> dict:
+    upf_tunnels_mappings = {}
+    for vmpath in env.get_vms():
+        vmconfig = VMConfig(vmpath)
+        if vmconfig.vm_type != VM_TYPE_UPF:
+            continue
+
+        mapping = {
+            vmpath.vm_name: vmconfig.metadata['tunnels']
+        }
+        upf_tunnels_mappings.update(mapping)
+    return upf_tunnels_mappings

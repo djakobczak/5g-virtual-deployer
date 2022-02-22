@@ -10,6 +10,10 @@ from fgcore_runner.utils import read_yaml
 
 LOG = logging.getLogger(__name__)
 
+VM_TYPE_BUILDER = 'builder'
+VM_TYPE_CORE = 'cplane'
+VM_TYPE_UPF = 'upf'
+
 
 @dataclass
 class VMPath:
@@ -40,6 +44,12 @@ class VMPath:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.images_dir.mkdir(parents=True, exist_ok=True)
 
+    def __str__(self) -> str:
+        return self.vm_name
+
+    def __repr__(self) -> str:
+        return self.vm_name
+
 
 class VMConfig:
     def __init__(self, vmpath: VMPath) -> None:
@@ -52,6 +62,15 @@ class VMConfig:
     @property
     def user_data(self) -> dict:
         return read_yaml(self.vmpath.user_data)
+
+    @property
+    def metadata(self) -> dict:
+        return read_yaml(self.vmpath.metadata)
+
+    @metadata.setter
+    def metadata(self, update_dict: dict) -> None:
+        metadata_dict = self.metadata
+        metadata_dict.update(update_dict)
 
     @property
     def interfaces(self) -> List[dict]:
@@ -67,6 +86,17 @@ class VMConfig:
         ]
         return ifaces
 
+    @property
+    def ips(self) -> List[str]:
+        return [ip.split('/')[0]
+                for iface in self.interfaces
+                for ip in iface['ips']]
+
+    @property
+    def vm_type(self) -> str:
+        return self.metadata.get('vm-type')
+
+
 class EnvManager:
     def __init__(self, working_dir: str) -> None:
         self.working_dir = Path(working_dir)
@@ -77,31 +107,29 @@ class EnvManager:
         self.vms_dir.mkdir(parents=True, exist_ok=True)
         self.base_images_dir.mkdir(parents=True, exist_ok=True)
         self.nf_configs_dir.mkdir(parents=True, exist_ok=True)
-        self.vms = self.get_vms()
+        self.vms = self.get_vms(exclude_builder=False)
 
-    def add_vm(self, name: str) -> None:
-        vm_path = VMPath(self.vms_dir, name)
-        if vm_path in self.vms:
+    def init_vm_env(self, name: str) -> None:
+        vm_env = VMPath(self.vms_dir, name)
+        if vm_env in self.vms:
             raise Exception(f"Env for vm {name} already exists")
-        vm_path.init_paths()
-        self.vms.append(vm_path)
+        vm_env.init_paths()
+        self.vms.append(vm_env)
 
     def remove_vm(self, name: str) -> None:
         vm_path = VMPath(self.vms_dir, name)
+        LOG.debug(f"VMs: {self.vms}")
         if vm_path not in self.vms:
             raise Exception(f"Env for vm {name} does not exists")
         LOG.info(f'Remove {vm_path.base_dir}')
         shutil.rmtree(vm_path.base_dir)
         self.vms.remove(vm_path)
 
-    def clear(self, vm_names=None, remove_all=False):
-        LOG.debug(f'Clear vms: {vm_names}, remove all: {remove_all}')
-        if not any([vm_names, remove_all]):
-            return
-
+    def clear(self, vm_names=None):
+        LOG.info('Clear all vms')
         for path in self.get_vms():
-            if remove_all or path.vm_name in vm_names:
-                LOG.info(f'Remove {path.base_dir}')
+            if not vm_names or path.vm_name in vm_names:
+                LOG.debug(f'Remove {path.base_dir}')
                 shutil.rmtree(path.base_dir)
                 self.vms.remove(path)
 
@@ -109,16 +137,27 @@ class EnvManager:
         # requires tree installed
         subprocess.run(['tree', self.working_dir], check=True)
 
-    def get_vms(self):
-        return [VMPath(self.vms_dir, p.name)
+    def get_vms(self, exclude_builder: bool = True) -> List[VMPath]:
+        vms = [VMPath(self.vms_dir, p.name)
                 for p in self.vms_dir.iterdir()
                 if p.name != 'base-images']
+        if exclude_builder:
+            vms = list(filter(
+                lambda vm: vm.vm_name not in VM_TYPE_BUILDER, vms))
+        return vms
 
-    def get_vm_names(self) -> List[str]:
-        return [vm_path.vm_name for vm_path in self.get_vms()]
+    def get_vm_names(self, exclude_builder: bool = True) -> List[str]:
+        vm_names = [vm_path.vm_name for vm_path in self.get_vms(exclude_builder=exclude_builder)]
+        return vm_names
+
+    def get_core_vm_names(self) -> List[str]:
+        return [vm_path.vm_name for vm_path in self.get_vms(exclude_builder=False)
+                if VM_TYPE_BUILDER not in vm_path.vm_name]
 
     def is_vm_initialized(self, vm_name: str) -> bool:
-        return vm_name in self.get_vm_names()
+        res = vm_name in self.get_vm_names(exclude_builder=False)
+        LOG.debug(f"Vm {vm_name} initialized: {res}")
+        return res
 
     def __getitem__(self, name: str):
         try:

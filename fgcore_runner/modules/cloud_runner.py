@@ -1,18 +1,24 @@
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
-import shutil
 import subprocess
 from typing import List
+from time import sleep
 
+from fgcore_runner.modules.env import VM_TYPE_CORE, VM_TYPE_UPF, EnvManager, VMConfig
 from fgcore_runner.utils import generate_mac
 
 
 LOG = logging.getLogger(__name__)
 
-VM_TYPE_BUILDER = 'builder'
-VM_TYPE_CORE = 'cplane'
-VM_TYPE_UPF = 'upf'
+SCRIPT_DIR = Path(Path(__file__).resolve().parent.parent, 'scripts')
+OPERATOR_USERNAME = "ops"
+VM_HOME_DIR = Path("/", "home", OPERATOR_USERNAME)
+NF_CONFIGS_LOCAL = Path.home() / '5gcore-vms-wd' / 'nf_configs'
+COPY_SCRIPTS = [
+    {'src': str(NF_CONFIGS_LOCAL), 'dst': str(VM_HOME_DIR / 'nf_configs')},
+    {'src': str(SCRIPT_DIR), 'dst': str(VM_HOME_DIR)},
+]
 
 
 @dataclass
@@ -41,55 +47,6 @@ class VMPath:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.images_dir.mkdir(parents=True, exist_ok=True)
 
-
-class EnvManager:
-    def __init__(self, working_dir: str) -> None:
-        self.working_dir = Path(working_dir)
-        self.vms_dir = Path(working_dir) / 'vms'
-        self.base_images_dir = Path(working_dir) / 'base-images'
-
-        self.vms_dir.mkdir(parents=True, exist_ok=True)
-        self.base_images_dir.mkdir(parents=True, exist_ok=True)
-        self.vms = self.get_vms()
-
-    def init_vm_env(self, name: str, vm_type: str = VM_TYPE_CORE) -> None:
-        vm_env = VMPath(self.vms_dir, f"{name}-{vm_type}")
-        if vm_env in self.vms:
-            raise Exception(f"Env for vm {name} already exists")
-        self.vms.append(vm_env)
-
-    def clear(self, vm_names=None):
-        LOG.info('Clear all vms')
-        for path in self.get_vms():
-            if not vm_names or path.vm_name in vm_names:
-                LOG.debug(f'Remove {path.base_dir}')
-                shutil.rmtree(path.base_dir)
-                self.vms.remove(path)
-
-    def print_working_directory(self) -> None:
-        # requires tree installed
-        subprocess.run(['tree', self.working_dir], check=True)
-
-    def get_vms(self) -> List[VMPath]:
-        return [VMPath(self.vms_dir, p.name)
-                for p in self.vms_dir.iterdir()
-                if p.name != 'base-images']
-
-    def get_vm_names(self) -> List[str]:
-        return [vm_path.vm_name for vm_path in self.get_vms()]
-
-    def get_core_vm_names(self) -> List[str]:
-        return [vm_path.vm_name for vm_path in self.get_vms()
-                if VM_TYPE_BUILDER not in vm_path.vm_name]
-
-    def is_vm_initialized(self, vm_name: str) -> bool:
-        return vm_name in self.get_vm_names()
-
-    def __getitem__(self, name: str):
-        try:
-            return next(vmpath for vmpath in self.vms if vmpath.vm_name == name)
-        except StopIteration:
-            raise LookupError(f'VM with name {name} not initilized by EnvManager')
 
 
 class VmManager:
@@ -246,3 +203,28 @@ class VmManager:
 
     def is_vm_created(self, name: str) -> bool:
         return name in self.get_vms_created()
+
+    def copy_configs(self, vm_name: str) -> None:
+        for copy_def in COPY_SCRIPTS:
+            src = copy_def.get('src')
+            dst = copy_def.get('dst')
+            self.scp_to_vm(vm_name, src, dst)
+
+    def wait_for_vm_active(self, vm_name: str):
+        vmpath = self.env_manager[vm_name]
+        vm_config = VMConfig(vmpath)
+        vm_ip = vm_config.ips[0]  # !TODO add waiter
+        cmd = [
+            'ping', '-c',
+        ]
+        LOG.debug("Sleep for 15s...")
+        sleep(15)
+
+    def scp_to_vm(self, vm_name: str, src: str, dst: str, login: str = 'ops'):
+        vmpath = self.env_manager[vm_name]
+        vm_config = VMConfig(vmpath)
+        vm_ip = vm_config.ips[0]
+        target = f"{login}@{vm_ip}:{dst}"
+        cmd = ["scp", "-r", src, target]
+        LOG.debug("Run command: '{}'".format(' '.join(cmd)))
+        subprocess.run(cmd, check=True)

@@ -5,6 +5,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 from jinja2 import FileSystemLoader, Environment
+from yaml import dump
 
 from configs import MVM_IP
 
@@ -23,12 +24,20 @@ class Templar:
         return generated
 
     @staticmethod
-    def save(generated: str, dst: str, mkparents=False) -> None:
+    def save(content: str, dst: str, mkparents=False) -> None:
         if mkparents:
             Path(dst).parent.mkdir(parents=True, exist_ok=True)
 
         with open(dst, 'w+') as out_fd:
-            out_fd.write(generated)
+            out_fd.write(content)
+
+    @staticmethod
+    def save_yaml(content: str, dst: str, mkparents: bool = False) -> None:
+        if mkparents:
+            Path(dst).parent.mkdir(parents=True, exist_ok=True)
+
+        with open(dst, 'w+') as out_fd:
+            dump(content, out_fd, default_flow_style=False)
 
 
 class CloudTemplar(Templar):
@@ -89,6 +98,12 @@ class CloudTemplar(Templar):
 
     RESET_CLOUD_INIT = ['cloud-init clean']
 
+    TUN_CONFIGURE = [
+        'ip tuntap add name {TUN_DEV} mode tun',
+        'ip addr add {TUN_IP} dev {TUN_DEV}',
+        'ip link set {TUN_DEV} up'
+    ]
+
     def __init__(self,
                  template_dir: str,
                  ssh_key_path: str = str(Path('keys', 'hyper_id_rsa.pub')),
@@ -115,6 +130,27 @@ class CloudTemplar(Templar):
     def generate_cplane_node(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['runcmd'] = ['echo OK']
+
+        user_data = self.render(self.user_data_fn, **user_data_vars)
+        network_data = self.render(self.network_data_fn, **network_data_vars)
+        return {
+            'user_data': user_data,
+            'network_data': network_data
+        }
+
+    def generate_upf_node(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        user_data_vars['runcmd'] = []
+
+        user_plane_tunnels = config.get('tunnels')
+        for tunnel in user_plane_tunnels:
+            tun_dev = tunnel['dev']
+            tun_ip = tunnel['ip']
+            tun_conf = list(map(
+                lambda ip_cmd: ip_cmd.format(TUN_DEV=tun_dev, TUN_IP=tun_ip),
+                self.TUN_CONFIGURE)
+            )
+            user_data_vars['runcmd'].extend(tun_conf)
 
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)
@@ -183,7 +219,7 @@ class CloudTemplar(Templar):
         return user_data_vars, network_data_vars
 
 
-MAX_UPFS = 10
+MAX_UPFS = 4
 
 @dataclass
 class CoreIpSchema:
@@ -244,9 +280,13 @@ class CoreIpSchema:
             'udm': { 'sbi_ip': self.udm_sbi },
             'udr': { 'sbi_ip': self.udr_sbi },
             'ausf': { 'sbi_ip': self.ausf_sbi },
-            'upfs': {
-                # !TODO
-            }
+            'upfs': [
+                {
+                    'pfcp_ip': self.upfs[n],
+                    'gtpu_ip': self.upfs[n]
+                }
+                for n in range(MAX_UPFS)
+            ]
         }
 
 class NfTemplar(Templar):
@@ -260,16 +300,41 @@ class NfTemplar(Templar):
         super().__init__(nfs_templates_dir)
         self.nfs_templates_dir = nfs_templates_dir
 
-    def generate(self, ip_schema: CoreIpSchema):
+    def generate(self, ip_schema: CoreIpSchema, **tunnels):
         templates = {}
+        jinja_vars = ip_schema.get_dict()
+        upfs_vars = self._get_upf_config(jinja_vars, **tunnels)
+        jinja_vars.update(upfs_vars)
+        # upfs configs
+        upfs_configs = self._generate_upf_config(upfs_vars)
+        templates.update(upfs_configs)
+        # smf config
+        # nf_config = self.render(f'smf.yaml.j2', **jinja_vars)
+        # templates['smf'] = nf_config
+        print(upfs_vars)
         for service in self.SERVICES:
             if service in ['upf', 'gnodeb', 'ue']:
                 continue  # !TODO
-            jinja_vars = ip_schema.get_dict()
             nf_config = self.render(f'{service}.yaml.j2', **jinja_vars)
-            LOG.debug(f"Config for service {service} generated")
             templates[service] = nf_config
+            LOG.debug(f"Config for service {service} generated")
         return templates
+
+    def _generate_upf_config(self, upfs_vars: dict):
+        configs = {}
+        for idx, upf_conf in enumerate(upfs_vars['upfs']):
+            print(f"generate config for upf: {upf_conf}")
+            upf_config = self.render('upf.yaml.j2', **upf_conf)
+            configs[f'upf-{idx}'] = upf_config
+        return configs
+
+    def _get_upf_config(self, jinja_vars, **tunnels):
+        configs = {'upfs': []}
+        for upf_idx, tuns_def in enumerate(tunnels.values()):
+            upf_def = jinja_vars['upfs'][upf_idx]
+            upf_vars = {'nets': tuns_def, **upf_def}
+            configs['upfs'].append(upf_vars)
+        return configs
 
 
 if __name__ == "__main__":

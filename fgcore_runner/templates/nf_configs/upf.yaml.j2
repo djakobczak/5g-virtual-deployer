@@ -1,17 +1,17 @@
 logger:
-    file: @localstatedir@/log/open5gs/upf.log
+    file: /open5gs/install/var/log/open5gs/upf.log
 
 upf:
     pfcp:
-      - addr: {{ upf.pfcp_ip }}
+      - addr: {{ pfcp_ip }}
     gtpu:
-      - addr: {{ upf.gtpu_ip }}
+      - addr: {{ gtpu_ip }}
     subnet:
-      {% for net in upf.nets %}}
+      {%- for net in nets %}
       - addr: {{ net.ip }}
         dnn: {{ net.dnn }}
         dev: {{ net.dev }}
-      {% endfor %}
+      {%- endfor %}
 
 smf:
 

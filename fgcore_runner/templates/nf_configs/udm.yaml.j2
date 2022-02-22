@@ -1,5 +1,5 @@
 logger:
-    file: @localstatedir@/log/open5gs/udm.log
+    file: /open5gs/install/var/log/open5gs/udm.log
 udm:
     sbi:
       - addr: {{ udm.sbi_ip }}
@@ -9,7 +9,6 @@ nrf:
     sbi:
       - addr:
           - {{ nrf.sbi_ip }}
-          - ::1
         port: 7777
 
 parameter:
