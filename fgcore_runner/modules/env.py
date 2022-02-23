@@ -13,6 +13,9 @@ LOG = logging.getLogger(__name__)
 VM_TYPE_BUILDER = 'builder'
 VM_TYPE_CORE = 'cplane'
 VM_TYPE_UPF = 'upf'
+VM_TYPE_RAN_BASE = 'ran_base'
+VM_TYPE_GNB = 'gnb'
+VM_TYPE_UE = 'ue'
 
 
 @dataclass

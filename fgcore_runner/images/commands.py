@@ -6,6 +6,9 @@ from fgcore_runner.modules.env import EnvManager
 from fgcore_runner.modules.cloud_runner import VmManager
 
 
+BASE_UBUNTU20_IMG = 'focal-server-cloudimg-amd64.img'
+
+
 @click.group()
 @click.pass_context
 @click.option("--working-dir", type=click.STRING, default=str(Path.home() / "5gcore-vms-wd"))

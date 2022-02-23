@@ -7,7 +7,7 @@ from typing import List
 
 import click
 
-from fgcore_runner.modules.env import VM_TYPE_CORE, VM_TYPE_UPF, EnvManager, VMConfig
+from fgcore_runner.modules.env import VM_TYPE_BUILDER, VM_TYPE_CORE, VM_TYPE_GNB, VM_TYPE_RAN_BASE, VM_TYPE_UE, VM_TYPE_UPF, EnvManager, VMConfig
 from fgcore_runner.modules.templar import CloudTemplar, CoreIpSchema, NfTemplar
 from fgcore_runner.utils import generate_mac
 
@@ -39,7 +39,7 @@ def env(ctx, **kwargs):
 @env.command()
 @click.pass_context
 @click.argument("name")
-@click.option("--type", type=click.Choice(["cplane", "upf", "gnodeb", "ue"]),
+@click.option("--type", type=click.Choice(["cplane", "upf", "gnb", "ue", "ran_base", "core_base"]),
               default="cplane")
 @click.option("--upf-idx", type=click.INT, help="Used to determine upf number, starts from 0 [UPF only]")
 @click.option("--tunnel", type=click.STRING, multiple=True,
@@ -67,10 +67,7 @@ def add(ctx, **kwargs):
         "ip": ip,
         "tunnels": tunnels_config
     }
-    if vm_type == VM_TYPE_CORE:
-        cloud_configs = templar.generate_cplane_node(**config)
-    elif vm_type == VM_TYPE_UPF:
-        cloud_configs = templar.generate_upf_node(**config)
+    cloud_configs = _generate_cloud_config(templar, vm_type, config)
 
     metadata_def = {
         'vm-type': vm_type,
@@ -83,13 +80,32 @@ def add(ctx, **kwargs):
     templar.save_yaml(metadata_def, vmpath.metadata)
     LOG.info(f"VM ({name}, {vm_type}) env initialized")
 
-def _get_ip_based_on_type(vm_type, ipschema, upf_idx=None) -> ipaddress.IPv4Address:
+
+def _generate_cloud_config(templar, vm_type, config):
+    if vm_type == VM_TYPE_CORE:
+        cloud_configs = templar.generate_cplane_node(**config)
+    elif vm_type == VM_TYPE_UPF:
+        cloud_configs = templar.generate_upf_node(**config)
+    elif vm_type == VM_TYPE_RAN_BASE:
+        cloud_configs = templar.generate_ran_base_config(**config)
+    elif vm_type in [VM_TYPE_GNB, VM_TYPE_UE]:
+        cloud_configs = templar.generate_common_ran_config(**config)
+    return cloud_configs
+
+
+def _get_ip_based_on_type(vm_type: str, ipschema: CoreIpSchema, upf_idx: int=None) -> ipaddress.IPv4Address:
     if vm_type == VM_TYPE_CORE:
         ip = ipschema.ext_ip
     elif vm_type == VM_TYPE_UPF:
         if upf_idx is None:
             raise Exception("Vm type upf requires upf-idx")
         ip = ipschema.upfs[upf_idx]
+    elif vm_type == VM_TYPE_RAN_BASE:
+        ip =  ipschema.ran_builder
+    elif vm_type == VM_TYPE_GNB:
+        ip =  ipschema.gnb_ip
+    elif vm_type == VM_TYPE_UE:
+        ip =  ipschema.ue_ip
     else:
         raise NotImplementedError(f"Type {vm_type} not supported yet")
     return ip
@@ -108,20 +124,27 @@ def _parse_tunnels_opt(tunnels) -> List[dict]:
 @env.command()
 @click.pass_context
 @click.argument("name")
+@click.option("--force", help="Force to delte base vm env")
 def remove(ctx, **kwargs):
     """ Remove vm """
     env = ctx.obj['env']
     vm_name = kwargs.get("name")
+    force = kwargs.get("force")
     confirmation = click.confirm(f'This command will remove vm ({vm_name}), '
                                  'do you want to continue?')
     if confirmation:
+        vmpath = env[vm_name]
+        vmconfig = VMConfig(vmpath)
+        if vmconfig.vm_type in [VM_TYPE_RAN_BASE, VM_TYPE_BUILDER] and not force:
+            LOG.warning("In order to remove base vm you have to add --force option")
+            return
         env.remove_vm(vm_name)
 
 
 @env.command()
 @click.pass_context
 @click.option("--vm", multiple=True, help="VM to remove")  # !TODO add mutally excluded
-@click.option("--all", is_flag=True , help="Clea all vms")
+@click.option("--all", is_flag=True , help="Clear all vms")
 def clear(ctx, **kwargs):
     """ Clear env """
     env = ctx.obj['env']

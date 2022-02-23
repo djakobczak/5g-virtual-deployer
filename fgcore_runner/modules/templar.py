@@ -72,6 +72,26 @@ class CloudTemplar(Templar):
         'mongodb'
     ]
 
+    RAN_PACKAGES = [
+        'make',
+        'gcc',
+        'g++',
+        'libsctp-dev',
+        'lksctp-tools',
+        'iproute2'
+    ]
+
+    PRE_RUNCMD_RAN = [
+        'snap install cmake --classic'
+    ]
+
+    BUILD_UERANSIM = [
+        'git clone https://github.com/aligungr/UERANSIM',
+        'git checkout v3.2.6',
+        'cd UERANSIM',
+        'make'
+    ]
+
     MVM_PACKAGES = [
         'nfs-kernel-server',
     ]
@@ -96,7 +116,7 @@ class CloudTemplar(Templar):
         'chmod -R 755 /open5gs/',
     ]
 
-    RESET_CLOUD_INIT = ['cloud-init clean']
+    # RESET_CLOUD_INIT = ['cloud-init clean']
 
     TUN_CONFIGURE = [
         'ip tuntap add name {TUN_DEV} mode tun',
@@ -118,8 +138,22 @@ class CloudTemplar(Templar):
     def generate_cplane_node_base(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['packages'] += self.CPLANE_PACKAGES
-        user_data_vars['runcmd'] = self.BUILD_5GCORE + self.RESET_CLOUD_INIT
+        user_data_vars['runcmd'] = self.BUILD_5GCORE
 
+        user_data = self.render(self.user_data_fn, **user_data_vars)
+        network_data = self.render(self.network_data_fn, **network_data_vars)
+        return {
+            'user_data': user_data,
+            'network_data': network_data
+        }
+
+    def generate_ran_base_config(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        user_data_vars['packages'] += self.RAN_PACKAGES
+        user_data_vars['runcmd'] = self.PRE_RUNCMD_RAN + self.BUILD_UERANSIM
+        return self._generate_cloud_configs(user_data_vars, network_data_vars)
+
+    def _generate_cloud_configs(self, user_data_vars: dict, network_data_vars: dict):
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)
         return {
@@ -137,6 +171,11 @@ class CloudTemplar(Templar):
             'user_data': user_data,
             'network_data': network_data
         }
+
+    def generate_common_ran_config(self, **config):
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        user_data_vars['runcmd'] = ['echo OK']
+        return self._generate_cloud_configs(user_data_vars, network_data_vars)
 
     def generate_upf_node(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
@@ -238,6 +277,12 @@ class CoreIpSchema:
     upfs: List[ipaddress.IPv4Address] = field(init=False)
     gnodeb: ipaddress.IPv4Address = field(init=False)
     ues: List[ipaddress.IPv4Address] = field(init=False)
+    gnb_linkIp: ipaddress.IPv4Address = field(init=False)
+    gnb_ngapIp: ipaddress.IPv4Address = field(init=False)
+    gnb_gtpIp: ipaddress.IPv4Address = field(init=False)
+    ran_builder: ipaddress.IPv4Address = field(init=False)
+    gnb_ip: ipaddress.IPv4Address = field(init=False)
+    ue_ip: ipaddress.IPv4Address = field(init=False)
 
     def __post_init__(self):
         self.ext_ip = self.ext_net[10]  # !TODO cplane all in one vm
@@ -258,6 +303,12 @@ class CoreIpSchema:
         self.nssf_sbi = self.sbi_net[20]
         self.upfs = [self.ext_net[100 + n]
                      for n in range(MAX_UPFS)]
+        self.gnb_ip = self.ext_net[50]
+        self.gnb_linkIp = self.gnb_ip  # 1 gnb support
+        self.gnb_ngapIp = self.gnb_ip
+        self.gnb_gtpIp = self.gnb_ip
+        self.ran_builder = self.ext_net[200]
+        self.ue_ip = self.ext_net[60]
 
     def get_dict(self):
         return {
@@ -286,34 +337,40 @@ class CoreIpSchema:
                     'gtpu_ip': self.upfs[n]
                 }
                 for n in range(MAX_UPFS)
-            ]
+            ],
+            'gnb': {
+                'linkIp': self.gnb_linkIp,
+                'ngapIp': self.gnb_ngapIp,
+                'gtpIp': self.gnb_gtpIp
+            }
         }
 
 class NfTemplar(Templar):
     SERVICES = [
         'amf', 'ausf', 'bsf', 'nrf', 'nssf',
         'pcf', 'pcrf', 'smf', 'udm', 'udr', 'upf',
-        'gnodeb', 'ue'
+        'gnb', 'ue'
     ]
 
     def __init__(self, nfs_templates_dir: str) -> None:
         super().__init__(nfs_templates_dir)
         self.nfs_templates_dir = nfs_templates_dir
 
-    def generate(self, ip_schema: CoreIpSchema, **tunnels):
+    def generate(self, ip_schema: CoreIpSchema, n_ue: int=20, **tunnels):
         templates = {}
         jinja_vars = ip_schema.get_dict()
         upfs_vars = self._get_upf_config(jinja_vars, **tunnels)
         jinja_vars.update(upfs_vars)
+
         # upfs configs
         upfs_configs = self._generate_upf_config(upfs_vars)
         templates.update(upfs_configs)
-        # smf config
-        # nf_config = self.render(f'smf.yaml.j2', **jinja_vars)
-        # templates['smf'] = nf_config
-        print(upfs_vars)
+
+        ue_configs = self._generate_ue_configs(jinja_vars,n_ue)
+        templates.update(ue_configs)
+
         for service in self.SERVICES:
-            if service in ['upf', 'gnodeb', 'ue']:
+            if service in ['upf', 'ue']:
                 continue  # !TODO
             nf_config = self.render(f'{service}.yaml.j2', **jinja_vars)
             templates[service] = nf_config
@@ -328,7 +385,7 @@ class NfTemplar(Templar):
             configs[f'upf-{idx}'] = upf_config
         return configs
 
-    def _get_upf_config(self, jinja_vars, **tunnels):
+    def _get_upf_config(self, jinja_vars: dict, **tunnels):
         configs = {'upfs': []}
         for upf_idx, tuns_def in enumerate(tunnels.values()):
             upf_def = jinja_vars['upfs'][upf_idx]
@@ -336,6 +393,17 @@ class NfTemplar(Templar):
             configs['upfs'].append(upf_vars)
         return configs
 
+    def _generate_ue_configs(self, jinja_vars: dict, n_ue: int):
+        configs = {}
+        for ue_idx in range(n_ue):
+            msisdn = f'{ue_idx+1}'.zfill(10)
+            # IMSI = [MCC|MNC|MSISDN]
+            imsi = f'imsi-00101{msisdn}'
+            ue_config = {'imsi': imsi}
+            ue_config.update(jinja_vars)
+            upf_config = self.render('ue.yaml.j2', **ue_config)
+            configs[f'ue-{ue_idx}'] = upf_config
+        return configs
 
 if __name__ == "__main__":
     TEMPLATES_DIR = Path(Path(__file__).resolve().parent.parent, 'templates', 'nf_configs')
