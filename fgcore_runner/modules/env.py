@@ -16,7 +16,15 @@ VM_TYPE_UPF = 'upf'
 VM_TYPE_RAN_BASE = 'ran_base'
 VM_TYPE_GNB = 'gnb'
 VM_TYPE_UE = 'ue'
-
+VM_BASE_TYPES = [VM_TYPE_BUILDER, VM_TYPE_RAN_BASE]
+VM_TYPES =[
+    VM_TYPE_BUILDER,
+    VM_TYPE_RAN_BASE,
+    VM_TYPE_CORE,
+    VM_TYPE_UPF,
+    VM_TYPE_GNB,
+    VM_TYPE_UE
+]
 
 @dataclass
 class VMPath:
@@ -146,7 +154,8 @@ class EnvManager:
                 if p.name != 'base-images']
         if exclude_builder:
             vms = list(filter(
-                lambda vm: vm.vm_name not in VM_TYPE_BUILDER, vms))
+                lambda vm: VMConfig(vm).vm_type not in VM_BASE_TYPES, vms))
+        print(vms)
         return vms
 
     def get_vm_names(self, exclude_builder: bool = True) -> List[str]:

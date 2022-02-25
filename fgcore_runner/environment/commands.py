@@ -7,7 +7,7 @@ from typing import List
 
 import click
 
-from fgcore_runner.modules.env import VM_TYPE_BUILDER, VM_TYPE_CORE, VM_TYPE_GNB, VM_TYPE_RAN_BASE, VM_TYPE_UE, VM_TYPE_UPF, EnvManager, VMConfig
+from fgcore_runner.modules.env import VM_TYPE_BUILDER, VM_TYPE_CORE, VM_TYPE_GNB, VM_TYPE_RAN_BASE, VM_TYPE_UE, VM_TYPE_UPF, VM_TYPES, EnvManager, VMConfig
 from fgcore_runner.modules.templar import CloudTemplar, CoreIpSchema, NfTemplar
 from fgcore_runner.utils import generate_mac
 
@@ -39,12 +39,12 @@ def env(ctx, **kwargs):
 @env.command()
 @click.pass_context
 @click.argument("name")
-@click.option("--type", type=click.Choice(["cplane", "upf", "gnb", "ue", "ran_base", "core_base"]),
-              default="cplane")
-@click.option("--upf-idx", type=click.INT, help="Used to determine upf number, starts from 0 [UPF only]")
+@click.option("--type", type=click.Choice(VM_TYPES),
+              default=VM_TYPE_CORE)
+@click.option("--upf-idx", type=click.IntRange(min=0, max=10), help="Used to determine upf number, starts from 0 [UPF only]")
 @click.option("--tunnel", type=click.STRING, multiple=True,
               help="Tun interface definition in <dev,cidr,dnn> format e.g. ogstun,10.45.0.1/16,internet",
-              default=['ogstun1,10.45.0.1/16,internet1', 'ogstun2,10.45.0.2/16,internet2'])
+              default=['ogstun1,10.45.0.1/16,internet1', 'ogstun2,10.46.0.1/16,internet2'])
 def add(ctx, **kwargs):
     """ Add vm to environment """
     env = ctx.obj["env"]
@@ -65,14 +65,14 @@ def add(ctx, **kwargs):
         "name": name,
         "mac": generate_mac(),
         "ip": ip,
-        "tunnels": tunnels_config
+        "tunnels": tunnels_config if vm_type == VM_TYPE_UPF else []
     }
     cloud_configs = _generate_cloud_config(templar, vm_type, config)
 
     metadata_def = {
         'vm-type': vm_type,
         'tunnels': tunnels_config,
-        'upf-idx': upf_idx
+        'upf-idx': upf_idx if vm_type == VM_TYPE_UPF else ''
     }
     vmpath = env[config['name']]
     templar.save(cloud_configs['user_data'], vmpath.user_data)
@@ -88,6 +88,8 @@ def _generate_cloud_config(templar, vm_type, config):
         cloud_configs = templar.generate_upf_node(**config)
     elif vm_type == VM_TYPE_RAN_BASE:
         cloud_configs = templar.generate_ran_base_config(**config)
+    elif vm_type == VM_TYPE_BUILDER:
+        cloud_configs = templar.generate_cplane_node_base(**config)
     elif vm_type in [VM_TYPE_GNB, VM_TYPE_UE]:
         cloud_configs = templar.generate_common_ran_config(**config)
     return cloud_configs
@@ -106,6 +108,8 @@ def _get_ip_based_on_type(vm_type: str, ipschema: CoreIpSchema, upf_idx: int=Non
         ip =  ipschema.gnb_ip
     elif vm_type == VM_TYPE_UE:
         ip =  ipschema.ue_ip
+    elif vm_type == VM_TYPE_BUILDER:
+        ip =  ipschema.builder_ip
     else:
         raise NotImplementedError(f"Type {vm_type} not supported yet")
     return ip
@@ -143,17 +147,19 @@ def remove(ctx, **kwargs):
 
 @env.command()
 @click.pass_context
-@click.option("--vm", multiple=True, help="VM to remove")  # !TODO add mutally excluded
-@click.option("--all", is_flag=True , help="Clear all vms")
+@click.option("--vm", multiple=True, help="VM to remove")
 def clear(ctx, **kwargs):
     """ Clear env """
     env = ctx.obj['env']
     vms = kwargs.get("vm")
-    remove_all = kwargs.get("all")
-    confirmation = click.confirm('This command will remove all vms, '
-                                 'do you want to continue?')
-    if confirmation:
-        env.clear(vms, remove_all)
+    if not vms:
+        confirmation = click.confirm(
+            'This command will remove all non-base vms, '
+            'do you want to continue?')
+        if not confirmation:
+            return
+
+    env.clear(vms)
 
 
 @env.command()

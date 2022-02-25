@@ -17,3 +17,8 @@ open5gs-udrd -c "${CONFIG_DIR}/udr.yml" &
 open5gs-pcfd -c "${CONFIG_DIR}/pcf.yml" &
 open5gs-nssfd -c "${CONFIG_DIR}/nssf.yml" &
 open5gs-bsfd -c "${CONFIG_DIR}/bsf.yml" &
+
+# start webui
+mkdir -p /var/log/open5gs/
+cd /open5gs/webui
+HOSTNAME=192.168.122.10 PORT=3000 npm run dev > /var/log/open5gs/webui.log 2>&1 &

@@ -65,11 +65,12 @@ class CloudTemplar(Templar):
         'libcurl4-gnutls-dev',
         'libnghttp2-dev',
         'libtins-dev',
-        'meson'
+        'meson',
     ]
 
     CPLANE_PACKAGES = [
-        'mongodb'
+        'mongodb',
+        'curl'
     ]
 
     RAN_PACKAGES = [
@@ -113,15 +114,32 @@ class CloudTemplar(Templar):
         'ln -s ${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp/dict_dcca_3gpp.fdx '
             '${PWD}/build/subprojects/freeDiameter/extensions/dict_dcca_3gpp.fdx',
         'cp install/bin/open5gs-* /usr/bin/',
-        'chmod -R 755 /open5gs/',
+        'chmod -R 755 /open5gs/'
     ]
 
-    # RESET_CLOUD_INIT = ['cloud-init clean']
+    INSTALL_CPLANE_WEBUI = [
+        'curl -fsSL https://deb.nodesource.com/setup_14.x | sudo -E bash -',
+        'sudo apt install nodejs',
+        'cd /open5gs/webui',
+        'npm ci --no-optional'
+    ]
+
+    SET_IPV4_FORWARDING = [
+        'sed "s/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g" /etc/sysctl.conf',
+        'sysctl -p'
+    ]
+
+    # RESET_CLOUD_INIT = ['cloud-init clean']  # cloud-init cannot finish correclty with it
 
     TUN_CONFIGURE = [
         'ip tuntap add name {TUN_DEV} mode tun',
         'ip addr add {TUN_IP} dev {TUN_DEV}',
-        'ip link set {TUN_DEV} up'
+        'ip link set {TUN_DEV} up',
+        'iptables -t nat -A POSTROUTING -s {TUN_IP} ! -o ogstun -j MASQUERADE'
+    ]
+
+    UERANSIM_POST_INSTALL = [
+        'cp /UERANSIM/build/* /usr/bin/'
     ]
 
     def __init__(self,
@@ -138,7 +156,7 @@ class CloudTemplar(Templar):
     def generate_cplane_node_base(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['packages'] += self.CPLANE_PACKAGES
-        user_data_vars['runcmd'] = self.BUILD_5GCORE
+        user_data_vars['runcmd'] = self.BUILD_5GCORE + self.INSTALL_CPLANE_WEBUI
 
         user_data = self.render(self.user_data_fn, **user_data_vars)
         network_data = self.render(self.network_data_fn, **network_data_vars)
@@ -174,12 +192,12 @@ class CloudTemplar(Templar):
 
     def generate_common_ran_config(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
-        user_data_vars['runcmd'] = ['echo OK']
+        user_data_vars['runcmd'] = self.UERANSIM_POST_INSTALL
         return self._generate_cloud_configs(user_data_vars, network_data_vars)
 
     def generate_upf_node(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
-        user_data_vars['runcmd'] = []
+        user_data_vars['runcmd'] = self.SET_IPV4_FORWARDING
 
         user_plane_tunnels = config.get('tunnels')
         for tunnel in user_plane_tunnels:
@@ -283,6 +301,7 @@ class CoreIpSchema:
     ran_builder: ipaddress.IPv4Address = field(init=False)
     gnb_ip: ipaddress.IPv4Address = field(init=False)
     ue_ip: ipaddress.IPv4Address = field(init=False)
+    builder_ip: ipaddress.IPv4Address = field(init=False)
 
     def __post_init__(self):
         self.ext_ip = self.ext_net[10]  # !TODO cplane all in one vm
@@ -309,6 +328,7 @@ class CoreIpSchema:
         self.gnb_gtpIp = self.gnb_ip
         self.ran_builder = self.ext_net[200]
         self.ue_ip = self.ext_net[60]
+        self.builder_ip = self.ext_net[210]
 
     def get_dict(self):
         return {
