@@ -1,0 +1,18 @@
+[Unit]
+Description=Open5GS AMF Daemon
+After=network-online.target
+
+[Service]
+Type=simple
+
+User=root
+Group=root
+
+Restart=always
+ExecStart=/bin/open5gs-amfd -c /home/ops/nf_configs/amf.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

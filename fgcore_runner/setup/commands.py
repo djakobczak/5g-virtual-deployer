@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from fgcore_runner.modules.env import (VM_TYPE_RAN_BASE, EnvManager, VMConfig,
+from fgcore_runner.modules.env import (VM_BASE_TYPES, VM_TYPE_RAN_BASE, EnvManager, VMConfig,
                                        VM_TYPE_CORE, VM_TYPE_UPF, VM_TYPE_BUILDER)
 from fgcore_runner.modules.cloud_runner import VmManager
 
@@ -27,6 +27,7 @@ def setup(ctx, **kwargs):
 @click.option("--vm", type=click.STRING, multiple=True,
               help="List of vms to create, if not specified create all vms found in env")
 @click.option("--create-base", is_flag=True)
+@click.option("--skip-copy", is_flag=True)
 def create(ctx, **kwargs):
     envm = ctx.obj['envm']
     virtm = ctx.obj['virtm']
@@ -40,7 +41,7 @@ def create(ctx, **kwargs):
         vm_name = vm.vm_name
         vmconfig = VMConfig(vm)
         if not create_base and \
-            vmconfig.vm_type in [VM_TYPE_BUILDER, VM_TYPE_RAN_BASE]:
+            vmconfig.vm_type in VM_BASE_TYPES:
             LOG.info(f'VM {vm_name} has base type, skipping because `--create_base` not set')
             continue
 
@@ -51,7 +52,7 @@ def create(ctx, **kwargs):
         mac = vmconfig.interfaces[0]['mac']
         LOG.info(f"Provision vm {vm_name}")
         virtm.provision_vm(vm_name, mac=mac)  # !TODO add check if volumes and configs created, rebuild builder with cloud-init clean
-        if not create_base:
+        if not create_base and not kwargs.get('skip_copy'):
             virtm.wait_for_vm_active(vm_name)
             virtm.copy_configs(vm_name)
 

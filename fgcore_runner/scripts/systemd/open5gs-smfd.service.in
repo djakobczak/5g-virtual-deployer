@@ -1,0 +1,19 @@
+[Unit]
+Description=Open5GS SMF Daemon
+After=networking.service
+Requires=systemd-networkd.service
+
+[Service]
+Type=simple
+
+User=root
+User=root
+
+Restart=always
+ExecStart=/bin/open5gs-smfd -c /home/ops/nf_configs/smf.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

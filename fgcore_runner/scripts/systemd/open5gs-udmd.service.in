@@ -1,0 +1,18 @@
+[Unit]
+Description=Open5GS UDM Daemon
+After=networking.service
+
+[Service]
+Type=simple
+
+User=root
+User=root
+
+Restart=always
+ExecStart=/bin/open5gs-udmd -c /home/ops/nf_configs/udm.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
