@@ -2,7 +2,7 @@
 set -u
 
 IP="${1:-192.168.122.10}"
-TIMEOUT="0.2"
+TIMEOUT="0.1"
 
 SUCCESS=1
 echo "$(date +"%T.%6N") start waiting for vm"

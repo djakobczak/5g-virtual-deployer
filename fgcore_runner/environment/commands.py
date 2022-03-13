@@ -184,13 +184,15 @@ def config(ctx, **kwargs):
 
 @config.command()
 @click.pass_context
+@click.option("--vms", type=click.STRING, help="Setup vms", required=True)
 def generate(ctx, **kwargs):
     templar = ctx.obj['templar']
     env = ctx.obj['env']
+    vms = kwargs.get('vms', '').split(',')
 
     ipschema = CoreIpSchema(sbi_net= ctx.obj["sbi_net"],
                             ext_net=ctx.obj['ext_net'])
-    extra_vars = _get_vm_tunnels(env)
+    extra_vars = _get_vm_tunnels(env, vms)
     LOG.debug(f"Found tunnels: {extra_vars}")
 
     configs = templar.generate(ipschema, **extra_vars)
@@ -200,15 +202,20 @@ def generate(ctx, **kwargs):
     LOG.info(f"All configs saved at {env.nf_configs_dir}")
 
 
-def _get_vm_tunnels(env) -> dict:
+def _get_vm_tunnels(env, vms) -> dict:
     upf_tunnels_mappings = {}
     for vmpath in env.get_vms():
         vmconfig = VMConfig(vmpath)
         if vmconfig.vm_type != VM_TYPE_UPF:
             continue
 
+        vm_name = vmpath.vm_name
+        if vm_name not in vms:
+            LOG.warning(f"VM {vm_name} not found")
+            continue
+
         mapping = {
-            vmpath.vm_name: vmconfig.metadata['tunnels']
+            vm_name: vmconfig.metadata['tunnels']
         }
         upf_tunnels_mappings.update(mapping)
     return upf_tunnels_mappings
