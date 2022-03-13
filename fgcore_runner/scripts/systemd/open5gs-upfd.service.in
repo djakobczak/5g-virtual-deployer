@@ -1,0 +1,19 @@
+[Unit]
+Description=Open5GS UPF Daemon
+After=networking.service
+Requires=systemd-networkd.service
+
+[Service]
+Type=simple
+
+User=root
+User=root
+
+Restart=always
+ExecStart=/bin/open5gs-upfd -c /home/ops/nf_configs/upf-0.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

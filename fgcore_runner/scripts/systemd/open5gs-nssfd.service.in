@@ -1,0 +1,18 @@
+[Unit]
+Description=Open5GS NSSF Daemon
+After=networking.service
+
+[Service]
+Type=simple
+
+User=root
+User=root
+
+Restart=always
+ExecStart=/bin/open5gs-nssfd -c /home/ops/nf_configs/nssf.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

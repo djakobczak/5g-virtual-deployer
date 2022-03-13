@@ -7,7 +7,7 @@ from typing import List
 
 import click
 
-from fgcore_runner.modules.env import VM_TYPE_BUILDER, VM_TYPE_CORE, VM_TYPE_GNB, VM_TYPE_RAN_BASE, VM_TYPE_UE, VM_TYPE_UPF, VM_TYPES, EnvManager, VMConfig
+from fgcore_runner.modules.env import VM_TYPE_BUILDER, VM_TYPE_CORE, VM_TYPE_GNB, VM_TYPE_RAN_BASE, VM_TYPE_TEST, VM_TYPE_UE, VM_TYPE_UPF, VM_TYPES, EnvManager, VMConfig
 from fgcore_runner.modules.templar import CloudTemplar, CoreIpSchema, NfTemplar
 from fgcore_runner.utils import generate_mac
 
@@ -92,6 +92,8 @@ def _generate_cloud_config(templar, vm_type, config):
         cloud_configs = templar.generate_cplane_node_base(**config)
     elif vm_type in [VM_TYPE_GNB, VM_TYPE_UE]:
         cloud_configs = templar.generate_common_ran_config(**config)
+    elif vm_type == VM_TYPE_TEST:
+        cloud_configs = templar.generate_test_config(**config)
     return cloud_configs
 
 
@@ -110,6 +112,8 @@ def _get_ip_based_on_type(vm_type: str, ipschema: CoreIpSchema, upf_idx: int=Non
         ip =  ipschema.ue_ip
     elif vm_type == VM_TYPE_BUILDER:
         ip =  ipschema.builder_ip
+    elif vm_type == VM_TYPE_TEST:
+        ip = ipschema.test_ip
     else:
         raise NotImplementedError(f"Type {vm_type} not supported yet")
     return ip
@@ -180,13 +184,15 @@ def config(ctx, **kwargs):
 
 @config.command()
 @click.pass_context
+@click.option("--vms", type=click.STRING, help="Setup vms", required=True)
 def generate(ctx, **kwargs):
     templar = ctx.obj['templar']
     env = ctx.obj['env']
+    vms = kwargs.get('vms', '').split(',')
 
     ipschema = CoreIpSchema(sbi_net= ctx.obj["sbi_net"],
                             ext_net=ctx.obj['ext_net'])
-    extra_vars = _get_vm_tunnels(env)
+    extra_vars = _get_vm_tunnels(env, vms)
     LOG.debug(f"Found tunnels: {extra_vars}")
 
     configs = templar.generate(ipschema, **extra_vars)
@@ -196,15 +202,20 @@ def generate(ctx, **kwargs):
     LOG.info(f"All configs saved at {env.nf_configs_dir}")
 
 
-def _get_vm_tunnels(env) -> dict:
+def _get_vm_tunnels(env, vms) -> dict:
     upf_tunnels_mappings = {}
     for vmpath in env.get_vms():
         vmconfig = VMConfig(vmpath)
         if vmconfig.vm_type != VM_TYPE_UPF:
             continue
 
+        vm_name = vmpath.vm_name
+        if vm_name not in vms:
+            LOG.warning(f"VM {vm_name} not found")
+            continue
+
         mapping = {
-            vmpath.vm_name: vmconfig.metadata['tunnels']
+            vm_name: vmconfig.metadata['tunnels']
         }
         upf_tunnels_mappings.update(mapping)
     return upf_tunnels_mappings

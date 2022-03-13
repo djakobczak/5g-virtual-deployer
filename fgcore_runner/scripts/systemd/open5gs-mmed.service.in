@@ -1,0 +1,18 @@
+[Unit]
+Description=Open5GS MME Daemon
+After=networking.service
+
+[Service]
+Type=simple
+
+User=root
+User=root
+
+Restart=always
+ExecStart=/bin/open5gs-mmed -c /home/ops/nf_configs/mme.yml
+RestartSec=2
+RestartPreventExitStatus=1
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

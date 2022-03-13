@@ -195,6 +195,11 @@ class CloudTemplar(Templar):
         user_data_vars['runcmd'] = self.UERANSIM_POST_INSTALL
         return self._generate_cloud_configs(user_data_vars, network_data_vars)
 
+    def generate_test_config(self, **config):
+        config['minimal'] = True
+        user_data_vars, network_data_vars = self._generate_common_config(**config)
+        return self._generate_cloud_configs(user_data_vars, network_data_vars)
+
     def generate_upf_node(self, **config):
         user_data_vars, network_data_vars = self._generate_common_config(**config)
         user_data_vars['runcmd'] = self.SET_IPV4_FORWARDING
@@ -259,7 +264,7 @@ class CloudTemplar(Templar):
         user_data_vars = {
             'hostname': config['name'],
             'keys': [key],
-            'packages': self.PACKAGES
+            'packages': self.PACKAGES if not config.get('minimal') else []
         }
 
         network_data_vars = {
@@ -302,6 +307,7 @@ class CoreIpSchema:
     gnb_ip: ipaddress.IPv4Address = field(init=False)
     ue_ip: ipaddress.IPv4Address = field(init=False)
     builder_ip: ipaddress.IPv4Address = field(init=False)
+    test_ip: ipaddress.IPv4Address = field(init=False)
 
     def __post_init__(self):
         self.ext_ip = self.ext_net[10]  # !TODO cplane all in one vm
@@ -329,6 +335,7 @@ class CoreIpSchema:
         self.ran_builder = self.ext_net[200]
         self.ue_ip = self.ext_net[60]
         self.builder_ip = self.ext_net[210]
+        self.test_ip = self.ext_net[253]
 
     def get_dict(self):
         return {

@@ -13,6 +13,7 @@ python3 fgcore_runner/cli.py images create --vm-name ue --src ran-base
 python3 fgcore_runner/cli.py env config generate
 
 python3 fgcore_runner/cli.py setup create
+#python3 fgcore_runner/cli.py setup create --vm cplane01 --vm upf01 --skip-copy
 
 # clear
 # python3 fgcore_runner/cli.py setup remove
