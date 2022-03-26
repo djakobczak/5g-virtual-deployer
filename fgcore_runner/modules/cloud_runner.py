@@ -5,6 +5,8 @@ import subprocess
 from typing import List
 from time import sleep
 
+from paramiko import SSHClient, MissingHostKeyPolicy
+
 from fgcore_runner.modules.env import VM_TYPE_CORE, VM_TYPE_UPF, EnvManager, VMConfig
 from fgcore_runner.utils import generate_mac
 
@@ -210,6 +212,14 @@ class VmManager:
             dst = copy_def.get('dst')
             self.scp_to_vm(vm_name, src, dst)
 
+    def enable_nf_service(self, host, service):
+        nf_configs_path = f'/home/ops/scripts/systemd/open5gs-{service}d.service'
+        cmd = f'sudo cp {nf_configs_path} /etc/systemd/system;'
+        cmd += 'sudo systemctl daemon-reload;'
+        cmd += f'sudo systemctl enable open5gs-{service}d;'
+        cmd += f'sudo systemctl start open5gs-{service}d'
+        self.exec_command(host, cmd)
+
     def wait_for_vm_active(self, vm_name: str):
         vmpath = self.env_manager[vm_name]
         vm_config = VMConfig(vmpath)
@@ -217,8 +227,8 @@ class VmManager:
         cmd = [
             'ping', '-c',
         ]
-        LOG.debug("Sleep for 15s...")
-        sleep(15)
+        LOG.debug("Sleep for 10s...")
+        sleep(10)
 
     def scp_to_vm(self, vm_name: str, src: str, dst: str, login: str = 'ops'):
         vmpath = self.env_manager[vm_name]
@@ -228,3 +238,16 @@ class VmManager:
         cmd = ["scp", "-r", src, target]
         LOG.debug("Run command: '{}'".format(' '.join(cmd)))
         subprocess.run(cmd, check=True)
+
+    def exec_command(self, vm_name: str, cmd: str, username='ops', password='ops'):
+        vmpath = self.env_manager[vm_name]
+        vm_config = VMConfig(vmpath)
+        vm_ip = vm_config.ips[0]
+        client = SSHClient()
+        # client.load_host_keys()
+        client.set_missing_host_key_policy(MissingHostKeyPolicy)
+        client.connect(vm_ip, username=username, password=password)
+        LOG.debug("Run command: '{}' on remote host {} ({})".format(
+            cmd, vm_name, vm_ip))
+        _, stdout, stderr = client.exec_command(cmd)
+        LOG.debug(f"Result stdout: {stdout.readlines()}, stderr: {stderr.readlines()}")

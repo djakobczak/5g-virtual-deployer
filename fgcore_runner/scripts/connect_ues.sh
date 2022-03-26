@@ -20,7 +20,7 @@ do
     sed "s/|IMSI|/${IMSI}/" ${UE_CONFIG_PATH} > ${UE_CONFIG}
 
     echo "$(date +%T%3N) - iteration $i - start ${N_UES} ues: first idx ${UE_NUM}"
-    timeout ${TIMEOUT} ${SCRIPT_PATH} ${UE_NUM} ${N_UES} $(pwd) ${UE_CONFIG} &>> ${LOG_FILE} &
+    timeout ${TIMEOUT} sudo ${SCRIPT_PATH} ${UE_NUM} ${N_UES} $(pwd) ${UE_CONFIG} &>> ${LOG_FILE} &
     UE_NUM=$(($UE_NUM + $N_UES))
     sleep 1
 done

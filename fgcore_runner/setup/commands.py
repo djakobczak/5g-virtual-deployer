@@ -22,6 +22,12 @@ def setup(ctx, **kwargs):
     ctx.obj['virtm'] = VmManager(em)
 
 
+SERVICES = [
+    'amf', 'ausf', 'bsf', 'nrf', 'nssf',
+    'pcf', 'pcrf', 'smf', 'udm', 'udr', 'upf',
+]
+
+
 @setup.command()
 @click.pass_context
 @click.option("--vm", type=click.STRING, multiple=True,
@@ -30,6 +36,7 @@ def setup(ctx, **kwargs):
 @click.option("--skip-copy", is_flag=True)
 @click.option("--ram", type=click.STRING, default=2048)
 @click.option("--cpu", type=click.STRING, default=2)
+@click.option("--nf-service", type=click.Choice(SERVICES), help='Nf service to start after boot')  # should be separate command
 def create(ctx, **kwargs):
     envm = ctx.obj['envm']
     virtm = ctx.obj['virtm']
@@ -37,6 +44,7 @@ def create(ctx, **kwargs):
     create_base = kwargs.get("create_base")
     ram = kwargs.get('ram')
     cpus = kwargs.get('cpu')
+    nf_service = kwargs.get('nf_service')
     requested_vms = [envm[name] for name in kwargs.get('vm')]
     vms = requested_vms or envm.get_vms()
 
@@ -59,6 +67,8 @@ def create(ctx, **kwargs):
         if not create_base and not kwargs.get('skip_copy'):
             virtm.wait_for_vm_active(vm_name)
             virtm.copy_configs(vm_name)
+        if nf_service:
+            virtm.enable_nf_service(vm_name, nf_service)
 
 
 @setup.command()

@@ -3,8 +3,7 @@
 ACTION="${1:-"start"}"
 
 # use virt-top for cpu usage
-TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
-# !TODO add memory usage
+# TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 CPU_USAGE_UPF_FILENAME="${2:-"/home/ops/monitoring/cpu_upf_${TEST_UNIQSUFIX}.log"}"
 MEMORY_USAGE_UPF_FILENAME="${3:-"/home/ops/monitoring/memory_upf_${TEST_UNIQSUFIX}.log"}"
 CPU_USAGE_CPLANE_FILENAME="${4:-"/home/ops/monitoring/cpu_cplane_${TEST_UNIQSUFIX}.log"}"

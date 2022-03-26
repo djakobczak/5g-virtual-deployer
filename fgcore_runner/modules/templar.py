@@ -322,7 +322,7 @@ class CoreIpSchema:
         self.smf_gtpc = self.sbi_net[16]
         self.smf_gtpu = self.sbi_net[16]
         self.smf_pfcp = self.ext_ip
-        self.udm_sbi = self.sbi_net[17]
+        # self.udm_sbi = self.sbi_net[17]
         self.udr_sbi = self.sbi_net[18]
         self.udm_sbi = self.sbi_net[19]
         self.nssf_sbi = self.sbi_net[20]
