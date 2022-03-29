@@ -1,0 +1,2 @@
+- docker stats reports cpu usage per core/thread
+- virt-top reports cpu usage regarding the all cores

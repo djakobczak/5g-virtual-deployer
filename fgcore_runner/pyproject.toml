@@ -10,6 +10,7 @@ Jinja2 = "^3.0.2"
 PyYAML = "^6.0"
 click = "^8.0.3"
 pymongo = "^4.0.1"
+paramiko = "^2.10.3"
 
 [tool.poetry.dev-dependencies]
 

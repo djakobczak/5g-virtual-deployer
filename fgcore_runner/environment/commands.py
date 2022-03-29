@@ -26,8 +26,8 @@ LOG = logging.getLogger(__name__)
 @click.pass_context
 @click.option("--working-dir", type=click.STRING, default=WORKING_DIR)
 @click.option("--templates-dir", type=click.STRING, default=TEMPLATES_DIR)
-@click.option('--ext_net', type=click.STRING, default=EXT_IP_SUBNET, show_default=True)
-@click.option('--sbi_net', type=click.STRING, default=SBI_IP_SUBNET, show_default=True)
+@click.option('--ext-net', type=click.STRING, default=EXT_IP_SUBNET, show_default=True)
+@click.option('--sbi-net', type=click.STRING, default=SBI_IP_SUBNET, show_default=True)
 def env(ctx, **kwargs):
     ctx.ensure_object(dict)
     ctx.obj['env'] = EnvManager(kwargs.get("working_dir"))
@@ -42,6 +42,7 @@ def env(ctx, **kwargs):
 @click.option("--type", type=click.Choice(VM_TYPES),
               default=VM_TYPE_CORE)
 @click.option("--upf-idx", type=click.IntRange(min=0, max=10), help="Used to determine upf number, starts from 0 [UPF only]")
+@click.option("--ip", type=click.STRING, help="Vm ip")
 @click.option("--tunnel", type=click.STRING, multiple=True,
               help="Tun interface definition in <dev,cidr,dnn> format e.g. ogstun,10.45.0.1/16,internet",
               default=['ogstun1,10.45.0.1/16,internet1', 'ogstun2,10.46.0.1/16,internet2'])
@@ -53,11 +54,12 @@ def add(ctx, **kwargs):
     vm_type = kwargs.get('type')
     upf_idx = kwargs.get('upf_idx')
     tunnels = kwargs.get('tunnel')
+    ip = kwargs.get('ip')
 
-    ipschema = CoreIpSchema(sbi_net= ctx.obj["sbi_net"],
+    ipschema = CoreIpSchema(sbi_net= ctx.obj['sbi_net'],
                             ext_net=ctx.obj['ext_net'])
 
-    ip = _get_ip_based_on_type(vm_type, ipschema, upf_idx)
+    ip = ip or _get_ip_based_on_type(vm_type, ipschema, upf_idx)
 
     env.init_vm_env(name)
     tunnels_config = _parse_tunnels_opt(tunnels)

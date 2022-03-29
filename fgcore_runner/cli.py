@@ -20,5 +20,9 @@ fgc.add_command(images_group.images)
 fgc.add_command(setup_group.setup)
 
 
-if __name__ == "__main__":
+def main():
     fgc()
+
+
+if __name__ == "__main__":
+    main()

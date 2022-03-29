@@ -101,4 +101,4 @@ def add_subscribers(n_subscribers: int):
 
 delete_all_subscribers()
 # delete_subscriber('001010000000001')
-add_subscribers(5)
+add_subscribers(2000)
