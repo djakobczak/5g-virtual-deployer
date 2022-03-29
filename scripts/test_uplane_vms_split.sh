@@ -2,7 +2,7 @@
 set -ux
 
 VUS="${1:-"1"}"
-STRESS_DURATION="${1:-"60s"}"
+STRESS_DURATION="${2:-"60s"}"
 LOGS_PATH="${3:-"/home/djak/5gcore_measurements/vms-split/test-uplane"}"
 UNIQ_TEST_NAME="test-$(date +"%H-%M-%S-%6N")"
 LOGS_FULL_PATH="${LOGS_PATH}/${UNIQ_TEST_NAME}"
@@ -13,6 +13,7 @@ mkdir -p ${LOGS_FULL_PATH} || exit 1
 TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 export TEST_UNIQSUFIX
 STRESS_TEST_LOG="/tmp/stress-${TEST_UNIQSUFIX}.log"
+MONITORING_MEM_SCRIPT="virsh_dommemstat.sh"
 
 STRESS_TEST_CMD="k6 run test_http.js --vus $VUS -d $STRESS_DURATION"
 ADD_ROUTE_CMD="sudo ip route add 192.168.0.38/32 dev uesimtun0"
@@ -34,6 +35,7 @@ python3 -m http.server &> "${SERVER_LOGS}" &   # start http server on port 8000
 
 # start gathering stats
 ./resource_monitoring.sh start ${CPU_USAGE_UPF_FILENAME} ${MEMORY_USAGE_UPF_FILENAME} ${CPU_USAGE_CPLANE_FILENAME} ${MEMORY_USAGE_CPLANE_FILENAME} ${CPU_USAGE_HOST_FILENAME}
+./monitoring/${MONITORING_MEM_SCRIPT} "${LOGS_FULL_PATH}/virsh_dommenstat.log" &
 
 sleep 10
 
@@ -43,6 +45,7 @@ __stop_gnb
 __stop_ue
 pkill -f "python3 -m http.server"
 ./resource_monitoring.sh stop
+pkill -f ${MONITORING_MEM_SCRIPT}
 
 mkdir ${LOGS_FULL_PATH}/open5gs || exit 1
 # gather logs

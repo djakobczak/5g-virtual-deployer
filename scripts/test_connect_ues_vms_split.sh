@@ -7,6 +7,7 @@ UNIQ_TEST_NAME="test-$(date +"%H-%M-%S-%6N")"
 LOGS_FULL_PATH="${LOGS_PATH}/${UNIQ_TEST_NAME}"
 
 CONNECT_UES_SCRIPT="/home/ops/scripts/connect_ues.sh"
+MONITORING_MEM_SCRIPT="virsh_dommemstat.sh"
 
 TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 export TEST_UNIQSUFIX
@@ -18,6 +19,7 @@ source common.sh
 # prepare
 mkdir -p ${LOGS_FULL_PATH} || exit 1
 ./resource_monitoring.sh start ${CPU_USAGE_UPF_FILENAME} ${MEMORY_USAGE_UPF_FILENAME} ${CPU_USAGE_CPLANE_FILENAME} ${MEMORY_USAGE_CPLANE_FILENAME} ${CPU_USAGE_HOST_FILENAME}
+./monitoring/${MONITORING_MEM_SCRIPT} "${LOGS_FULL_PATH}/virsh_dommenstat.log" &
 
 # restart cplane services
 __restart_splitted_cplane
@@ -58,3 +60,4 @@ mv ${CPU_USAGE_HOST_FILENAME} ${LOGS_FULL_PATH}/
 
 # stop monitoring
 ./resource_monitoring.sh stop
+pkill -f ${MONITORING_MEM_SCRIPT}

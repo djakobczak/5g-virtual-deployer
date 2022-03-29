@@ -4,8 +4,10 @@ set -u
 BOOTSTRAP_GNB_SCRIPT="/home/ops/scripts/bootstrap_gnb.sh"
 BOOTSTRAP_UE_SCRIPT="/home/ops/scripts/bootstrap_ue.sh"
 
+
 __restart_splitted_cplane(){
     echo "Restarting cplane..."
+    ssh ops@192.168.122.30 "sudo systemctl restart mongodb"
     ssh ops@192.168.122.13 "sudo rm -f /open5gs/install/var/log/open5gs/*; sudo systemctl restart open5gs-nrfd"
     ssh ops@192.168.122.10 "sudo rm -f /open5gs/install/var/log/open5gs/*; sudo systemctl restart open5gs-amfd"
     ssh ops@192.168.122.11 "sudo rm -f /open5gs/install/var/log/open5gs/*; sudo systemctl restart open5gs-ausfd"
@@ -47,4 +49,9 @@ __run_on_ue_fg(){
     local cmd="${1}"
     local log_file="${2:-"/tmp/cmd-$(date +"%H-%M-%S-%6N").log"}"
     ssh ops@192.168.122.60 "$cmd &> $log_file"
+}
+
+
+__start_splitted_cplane(){
+    virsh list --all --name | grep -v cplane | xargs -L1 -I{} virsh start {}
 }

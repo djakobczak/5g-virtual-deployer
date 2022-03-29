@@ -293,6 +293,7 @@ class CoreIpSchema:
     bsf_sbi: ipaddress.IPv4Address = field(init=False)
     nrf_sbi: ipaddress.IPv4Address = field(init=False)
     nssf_sbi: ipaddress.IPv4Address = field(init=False)
+    db_ip: ipaddress.IPv4Address = field(init=False)
     pcf_sbi: ipaddress.IPv4Address = field(init=False)
     smf_sbi: ipaddress.IPv4Address = field(init=False)
     udm_sbi: ipaddress.IPv4Address = field(init=False)
@@ -326,6 +327,7 @@ class CoreIpSchema:
         self.udr_sbi = self.sbi_net[18]
         self.udm_sbi = self.sbi_net[19]
         self.nssf_sbi = self.sbi_net[20]
+        self.db_ip = self.sbi_net[30]
         self.upfs = [self.ext_net[100 + n]
                      for n in range(MAX_UPFS)]
         self.gnb_ip = self.ext_net[50]
@@ -369,7 +371,8 @@ class CoreIpSchema:
                 'linkIp': self.gnb_linkIp,
                 'ngapIp': self.gnb_ngapIp,
                 'gtpIp': self.gnb_gtpIp
-            }
+            },
+            'db_ip': self.db_ip
         }
 
 class NfTemplar(Templar):

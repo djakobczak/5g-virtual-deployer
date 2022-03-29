@@ -23,38 +23,17 @@ fi
 
 mkdir -p ${UES_LOGS} || exit 1
 
-./monitoring/${MONITORING_SCRIPT} "${LOGS_FULL_PATH}/docker_stats.log" &
-
 pushd ${CONTAINER_PROJECT_PATH}
-
-echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
-echo -e "Params:\nN_UES: ${N_UES}\nN_ITERATIONS: ${N_ITERATIONS}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"
-
 docker-compose -f sa-deploy.yaml up -d
 docker-compose -f nr-gnb.yaml up -d
+popd
+./monitoring/${MONITORING_SCRIPT} "${LOGS_FULL_PATH}/docker_stats.log" &
+echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
+echo -e "Params:\nN_UES: ${N_UES}\nN_ITERATIONS: ${N_ITERATIONS}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"
+pushd ${CONTAINER_PROJECT_PATH}
 sleep 8
 
-# start ues
-# set -a
-# source .env
-# export NR_NUMBER_UES="${N_UES}"  # number of ues per ue container
-# N_ITERATIONS="$((10+${N_ITERATIONS}))"
-# UE_NUM="1"
-
 ssh ops@192.168.122.60 "sudo bash ${CONNECT_UES_SCRIPT} ${N_UES} ${N_ITERATIONS} ${UE_LOG_FILENAME} ${UE_TEMPLATE_PATH}"
-
-# for ueIpSuf in $(seq 10 ${N_ITERATIONS}); do
-#   export NR_UE_IP="172.22.0.1${ueIpSuf}"
-#   IMSI="00101$(printf %010d ${UE_NUM})"
-
-#   sed -i "s/UE1_IMSI.*/UE1_IMSI=${IMSI}/g" .env
-#   echo "$(date +"%H-%M-%S-%6N") - start ue-${ueIpSuf} " >> "${LOGS_FULL_PATH}/general.log"
-#   timeout ${TIMEOUT} docker-compose -p "ue-${ueIpSuf}" -f nr-ue.yaml up &> "${UES_LOGS}/ue-${ueIpSuf}.log" &
-#   sleep 1
-
-#   docker-compose -p "ue-${ueIpSuf}" -f nr-ue.yaml --no-color &>> "${UES_LOGS}/ue-${ueIpSuf}.log" &
-#   UE_NUM=$(($UE_NUM + $N_UES))
-# done
 
 sleep 10
 docker-compose -f nr-gnb.yaml logs --no-color &> "${UES_LOGS}/gnb.log"
