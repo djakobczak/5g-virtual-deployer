@@ -3,6 +3,7 @@ set -u
 
 BOOTSTRAP_GNB_SCRIPT="/home/ops/scripts/bootstrap_gnb.sh"
 BOOTSTRAP_UE_SCRIPT="/home/ops/scripts/bootstrap_ue.sh"
+CONFIG_DIR="/home/ops/configs"
 
 
 __restart_splitted_cplane(){
@@ -29,7 +30,8 @@ __start_gnb_bg(){
 
 __start_ue_bg(){
     local LOG_FILE=${1}
-    ssh ops@192.168.122.60 "nohup sudo bash ${BOOTSTRAP_UE_SCRIPT} 1 1 &> ${LOG_FILE} &"
+    local UE_CONFIG=${2:-""}
+    ssh ops@192.168.122.60 "nohup sudo bash ${BOOTSTRAP_UE_SCRIPT} 1 1 ${CONFIG_DIR} ${UE_CONFIG} &> ${LOG_FILE} &"
 }
 
 

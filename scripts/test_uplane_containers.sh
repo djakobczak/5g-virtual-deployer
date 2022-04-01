@@ -15,6 +15,7 @@ TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 export TEST_UNIQSUFIX
 STRESS_TEST_LOG="/tmp/stress-${TEST_UNIQSUFIX}.log"
 MONITORING_SCRIPT="docker_stats.sh"
+UE_CONFIG="ue-config-docker-1.yml"
 
 STRESS_TEST_CMD="k6 run test_http.js --vus $VUS -d $STRESS_DURATION"
 ADD_ROUTE_CMD="sudo ip route add 192.168.0.38/32 dev uesimtun0"
@@ -27,8 +28,8 @@ source common.sh
 pushd ${CONTAINER_PROJECT_PATH}
 docker-compose -f sa-deploy.yaml up -d
 docker-compose -f nr-gnb.yaml up -d
-__start_ue_bg ${UE_LOG_FILENAME}
-sleep 5
+sleep 10
+__start_ue_bg ${UE_LOG_FILENAME} ${UE_CONFIG}
 __run_on_ue_fg "${ADD_ROUTE_CMD}"
 python3 -m http.server &> "${SERVER_LOGS}" &   # start http server on port 8000
 sleep 5
@@ -40,10 +41,15 @@ echo -e "Params:\nVUS: ${VUS}\nSTRESS_DURATION: ${STRESS_DURATION}\nLOGS_PATH: $
 __run_on_ue_fg "$STRESS_TEST_CMD" "$STRESS_TEST_LOG"
 sleep 5
 
+docker-compose -f nr-gnb.yaml logs --no-color &> "${LOGS_FULL_PATH}/gnb.log"
+docker-compose logs --no-color &> "${LOGS_FULL_PATH}/core.log"
+scp ops@192.168.122.60:${STRESS_TEST_LOG} ${LOGS_FULL_PATH}/stress.log
+
 # clean up resources
 __stop_ue
 pkill -f "python3 -m http.server"
-docker-compose -f nr-gnb.yaml logs --no-color &> "${LOGS_FULL_PATH}/gnb.log"
-docker-compose logs --no-color &> "${LOGS_FULL_PATH}/core.log"
-
+docker-compose -f nr-gnb.yaml stop
+docker-compose stop
+docker-compose -f nr-gnb.yaml rm -f
+docker-compose rm -f
 popd

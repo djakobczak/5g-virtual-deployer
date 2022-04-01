@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ue
+set -uex
 
 TEST_SCRIPT="${1:-"test_bootstrap_time_vms.sh"}"
 NUMBER_OF_TESTS="${2:-"20"}"
