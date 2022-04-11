@@ -3,7 +3,15 @@ set -u
 
 BOOTSTRAP_GNB_SCRIPT="/home/ops/scripts/bootstrap_gnb.sh"
 BOOTSTRAP_UE_SCRIPT="/home/ops/scripts/bootstrap_ue.sh"
-CONFIG_DIR="/home/ops/configs"
+UPF_TUN_SCRIPT="/home/ops/set_tun.sh"
+# CONFIG_DIR="/home/ops/configs"
+CONFIG_DIR="/home/ops/nf_configs"
+
+
+__virsh_core_action(){
+    local ACTION="${1}"  # start/shutdown
+    virsh list --all --name | grep -v cplane | xargs -L1 -I{} virsh ${ACTION} {}
+}
 
 
 __restart_splitted_cplane(){
@@ -22,6 +30,18 @@ __restart_splitted_cplane(){
 }
 
 
+__set_tuns_upf(){
+    echo "Set tun and nat on upf..."
+    ssh ops@192.168.122.100 "sudo bash ${UPF_TUN_SCRIPT}"
+}
+
+
+__restart_upf(){
+    echo "Restarting uplane..."
+    ssh ops@192.168.122.100 "sudo rm -f /open5gs/install/var/log/open5gs/*; sudo systemctl restart open5gs-upfd"
+}
+
+
 __start_gnb_bg(){
     local LOG_FILE=${1}
     ssh ops@192.168.122.50 "nohup sudo bash ${BOOTSTRAP_GNB_SCRIPT} &> ${LOG_FILE} &"
@@ -31,6 +51,8 @@ __start_gnb_bg(){
 __start_ue_bg(){
     local LOG_FILE=${1}
     local UE_CONFIG=${2:-""}
+    local CONTAINER_CPLANE=${3:-""}
+    [[ -n "$CONTAINER_CPLANE" ]] && CONFIG_DIR="/home/ops/configs"
     ssh ops@192.168.122.60 "nohup sudo bash ${BOOTSTRAP_UE_SCRIPT} 1 1 ${CONFIG_DIR} ${UE_CONFIG} &> ${LOG_FILE} &"
 }
 

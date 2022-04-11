@@ -24,7 +24,6 @@ ADD_ROUTE_CMD="sudo ip route add 192.168.0.38/32 dev uesimtun0"
 source paths.sh
 source common.sh
 
-./monitoring/${MONITORING_SCRIPT} "${LOGS_FULL_PATH}/docker_stats.log" &
 pushd ${CONTAINER_PROJECT_PATH}
 docker-compose -f sa-deploy.yaml up -d
 docker-compose -f nr-gnb.yaml up -d
@@ -33,6 +32,11 @@ __start_ue_bg ${UE_LOG_FILENAME} ${UE_CONFIG}
 __run_on_ue_fg "${ADD_ROUTE_CMD}"
 python3 -m http.server &> "${SERVER_LOGS}" &   # start http server on port 8000
 sleep 5
+
+popd
+./monitoring/${MONITORING_SCRIPT} "${LOGS_FULL_PATH}/docker_stats.log" &
+sleep 5
+pushd ${CONTAINER_PROJECT_PATH}
 
 echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
 echo -e "Params:\nVUS: ${VUS}\nSTRESS_DURATION: ${STRESS_DURATION}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"

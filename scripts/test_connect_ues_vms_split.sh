@@ -1,9 +1,10 @@
 #!/bin/bash
+set -x
 
-N_UES="${1:-"10"}"  # number of ues start in one iteration
-N_ITERATIONS="${2:-"40"}"
+N_UES="${1:-"30"}"  # number of ues start in one iteration
+N_ITERATIONS="${2:-"30"}"
 LOGS_PATH="${3:-"/home/djak/5gcore_measurements/vms-split/test-connect-ues"}"
-UNIQ_TEST_NAME="test-$(date +"%H-%M-%S-%6N")"
+UNIQ_TEST_NAME="test-${N_UES}-${N_ITERATIONS}-$(date +"%H-%M-%S-%6N")"
 LOGS_FULL_PATH="${LOGS_PATH}/${UNIQ_TEST_NAME}"
 
 CONNECT_UES_SCRIPT="/home/ops/scripts/connect_ues.sh"
@@ -18,15 +19,19 @@ source common.sh
 
 # prepare
 mkdir -p ${LOGS_FULL_PATH} || exit 1
+__virsh_core_action "start"
+sleep 30
+
 ./resource_monitoring.sh start ${CPU_USAGE_UPF_FILENAME} ${MEMORY_USAGE_UPF_FILENAME} ${CPU_USAGE_CPLANE_FILENAME} ${MEMORY_USAGE_CPLANE_FILENAME} ${CPU_USAGE_HOST_FILENAME}
 ./monitoring/${MONITORING_MEM_SCRIPT} "${LOGS_FULL_PATH}/virsh_dommenstat.log" &
 
 # restart cplane services
 __restart_splitted_cplane
+__restart_upf
 
 # start gnb
 __start_gnb_bg ${GNB_LOG_FILENAME}
-sleep 10
+sleep 15
 
 echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
 echo -e "Params:\nN_UES: ${N_UES}\nN_ITERATIONS: ${N_ITERATIONS}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"
@@ -60,4 +65,6 @@ mv ${CPU_USAGE_HOST_FILENAME} ${LOGS_FULL_PATH}/
 
 # stop monitoring
 ./resource_monitoring.sh stop
-pkill -f ${MONITORING_MEM_SCRIPT}
+pkill -f "${MONITORING_MEM_SCRIPT}"
+
+__virsh_core_action "shutdown"

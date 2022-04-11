@@ -2,7 +2,6 @@
 
 ACTION="${1:-"start"}"
 
-# use virt-top for cpu usage
 # TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 CPU_USAGE_UPF_FILENAME="${2:-"/home/ops/monitoring/cpu_upf_${TEST_UNIQSUFIX}.log"}"
 MEMORY_USAGE_UPF_FILENAME="${3:-"/home/ops/monitoring/memory_upf_${TEST_UNIQSUFIX}.log"}"
@@ -10,7 +9,9 @@ CPU_USAGE_CPLANE_FILENAME="${4:-"/home/ops/monitoring/cpu_cplane_${TEST_UNIQSUFI
 MEMORY_USAGE_CPLANE_FILENAME="${5:-"/home/ops/monitoring/memory_upf_${TEST_UNIQSUFIX}.log"}"
 CPU_USAGE_HOST_FILENAME="${6:-"host_virt_${TEST_UNIQSUFIX}.csv"}"
 
-if [[ "${ACTION}" == "start" ]]; then
+if [[ "${ACTION}" == "start-min" ]]; then
+    virt-top -d 1 --csv ${CPU_USAGE_HOST_FILENAME} --script &
+elif [[ "${ACTION}" == "start" ]]; then
     # start cpu monitoring on vms
     ssh ops@192.168.122.10 "mkdir -p $(dirname ${CPU_USAGE_CPLANE_FILENAME})"
     ssh ops@192.168.122.10 "nohup sudo bash scripts/log_server_cpu_usage.sh ${CPU_USAGE_CPLANE_FILENAME} &> ${CPU_USAGE_CPLANE_FILENAME} &"

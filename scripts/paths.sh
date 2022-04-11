@@ -8,3 +8,4 @@ MEMORY_USAGE_CPLANE_FILENAME="/home/ops/monitoring/memory_cplane_${TEST_UNIQSUFI
 UE_LOG_FILENAME="/home/ops/logs/connect-ue-${TEST_UNIQSUFIX}.log"
 CPU_USAGE_HOST_FILENAME="host_virt_${TEST_UNIQSUFIX}.csv"
 GNB_LOG_FILENAME="/home/ops/gnb-${TEST_UNIQSUFIX}.log"
+CONTAINER_PROJECT_PATH="/home/djak/docker_open5gs/"
