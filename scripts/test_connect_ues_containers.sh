@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ux
 
-N_UES="${1:-"20"}"  # number of ues start in one iteration
+N_UES="${1:-"30"}"  # number of ues start in one iteration
 N_ITERATIONS="${2:-"30"}"
 CONTAINER_PROJECT_PATH="${3:-"/home/djak/docker_open5gs/"}"
 TIMEOUT="${4:-"5"}"

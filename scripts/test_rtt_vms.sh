@@ -1,14 +1,14 @@
 #!/bin/bash
 set -ux
 
-DURATION="${1:-"60"}"
-LOGS_PATH="${2:-"/home/djak/5gcore_measurements/vms-split/test-rtt"}"
+DURATION="${1:-"30"}"
+LOGS_PATH="${2:-"/home/djak/5gcore_measurements/vms-split/test-rtt-vhost-net"}"
 TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 LOGS_FULL_PATH="${LOGS_PATH}/test-${TEST_UNIQSUFIX}"
 
 TUN_DEV="uesimtun0"
-DEST="10.42.0.0"
-ADD_ROUTE_CMD="sudo ip route add ${DEST}/16 dev ${TUN_DEV}"
+DEST="10.42.0.1"
+ADD_ROUTE_CMD="sudo ip route add ${DEST}/32 dev ${TUN_DEV}"
 PING_CMD="ping -I ${TUN_DEV} -c ${DURATION} ${DEST}"
 PING_LOG="/tmp/test-ping-$(date +"%H-%M-%S-%6N").log"
 
@@ -43,4 +43,5 @@ sleep 5
 scp ops@192.168.122.60:${PING_LOG} ${LOGS_FULL_PATH}/ping.log
 
 __stop_gnb
+__stop_ue
 __virsh_core_action "shutdown"

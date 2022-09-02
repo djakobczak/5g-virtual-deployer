@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ux
 
-DURATION="${1:-"20"}"
+DURATION="${1:-"10"}"
 LOGS_PATH="${2:-"/home/djak/5gcore_measurements/vms-split/test-idle"}"
 TEST_UNIQSUFIX="$(date +%H-%M-%S-%6N)"
 LOGS_FULL_PATH="${LOGS_PATH}/test-${TEST_UNIQSUFIX}"

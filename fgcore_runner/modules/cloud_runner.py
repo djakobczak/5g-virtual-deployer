@@ -135,7 +135,8 @@ class VmManager:
                      vcpus: str = '2',
                      os_variant: str = 'ubuntu20.04',
                      virt_type: str = 'kvm',
-                     os_type: str = 'linux'):
+                     os_type: str = 'linux',
+                     bg=True):
         vmpath = self.env_manager[vm_name]
 
         if not mac:
@@ -163,31 +164,39 @@ class VmManager:
             '--noautoconsole'
         ]
         LOG.debug('Run command: %s', ' '.join(cmd))
-        result = subprocess.run(cmd, capture_output=True)
-        if result.stderr:
-            LOG.error(result)
+        if bg:
+            subprocess.Popen(cmd)
+        else:
+            result = subprocess.run(cmd, capture_output=True)
+            if result.stderr:
+                LOG.error(result)
 
     def validate_cloud_config(self, path: str):
         subprocess.run(['cloud-init', 'devel', 'schema',
                         '--config-file', f'{path}'],
                        check=True)
 
-    def destroy_vms(self, *vm_names: List[str], all=False) -> None:
+    def destroy_vms(self, *vm_names: List[str], all=False, bg=True) -> None:
         created_vm = self.get_vms_created()
         running_vms = self.get_vms_running()
         if all:
             vm_names = created_vm
 
+        if bg:
+            exec_func = subprocess.Popen
+        else:
+            exec_func = subprocess.run
+
         for vm_name in vm_names:
             if vm_name not in created_vm:
                 LOG.warning(f"VM {vm_name} is not created")
                 continue
-            subprocess.run(['virsh', 'undefine', vm_name])
+            exec_func(['virsh', 'undefine', vm_name])
 
             if vm_name not in running_vms:
                 LOG.warning(f"VM {vm_name} is not running")
                 continue
-            subprocess.run(['virsh', 'destroy', vm_name])
+            exec_func(['virsh', 'destroy', vm_name])
 
     def get_vms_created(self) -> List[str]:
         virsh_out = subprocess.run(

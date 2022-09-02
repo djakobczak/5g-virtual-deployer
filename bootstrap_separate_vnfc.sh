@@ -35,4 +35,5 @@ python3 fgcore_runner/cli.py setup create --vm cp-bsf --nf-service bsf
 python3 fgcore_runner/cli.py setup create --vm cp-nssf --nf-service nssf
 python3 fgcore_runner/cli.py setup create --vm cp-db
 
-python3 fgcore_runner/cli.py setup remove --vm cp-amf --vm cp-smf --vm cp-nrf --vm cp-udm --vm cp-udr --vm cp-pcf --vm cp-pcf --vm cp-ausf
+#python3 fgcore_runner/cli.py setup remove --vm cp-amf --vm cp-smf --vm cp-nrf --vm cp-udm --vm cp-udr --vm cp-pcf --vm cp-pcf --vm cp-ausf --vm cp-db --vm cp-nssf --vm cp-bsf --vm upf01-min-rdy
+#python3 fgcore_runner/cli.py setup create --vm cp-amf --vm cp-smf --vm cp-nrf --vm cp-udm --vm cp-udr --vm cp-pcf --vm cp-ausf --vm cp-db --vm cp-bsf --vm cp-nssf --vm upf01-min-rdy --skip-copy

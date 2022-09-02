@@ -1,10 +1,10 @@
 #!/bin/bash
 set -ux
 
-VUS="${1:-"1"}"
-STRESS_DURATION="${2:-"60s"}"
+VUS="${1:-"2"}"
+STRESS_DURATION="${2:-"30s"}"
 LOGS_PATH="${3:-"/home/djak/5gcore_measurements/vms-split/test-uplane"}"
-UNIQ_TEST_NAME="test-$(date +"%H-%M-%S-%6N")"
+UNIQ_TEST_NAME="${VUS}-${STRESS_DURATION}-test-$(date +"%H-%M-%S-%6N")"
 LOGS_FULL_PATH="${LOGS_PATH}/${UNIQ_TEST_NAME}"
 SERVER_LOGS="${LOGS_FULL_PATH}/server.log"
 
@@ -16,14 +16,14 @@ STRESS_TEST_LOG="/tmp/stress-${TEST_UNIQSUFIX}.log"
 MONITORING_MEM_SCRIPT="virsh_dommemstat.sh"
 
 STRESS_TEST_CMD="k6 run test_http.js --vus $VUS -d $STRESS_DURATION"
-ADD_ROUTE_CMD="sudo ip route add 192.168.0.38/32 dev uesimtun0"
+DST_IP="10.42.0.163"
+# DST_IP="192.168.0.38"
+ADD_ROUTE_CMD="sudo ip route add ${DST_IP}/32 dev uesimtun0"
 
 # source common function
 source paths.sh
 source common.sh
 
-echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
-echo -e "Params:\nVUS: ${VUS}\nSTRESS_DURATION: ${STRESS_DURATION}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"
 
 # prepare setup
 __restart_splitted_cplane
@@ -39,6 +39,8 @@ python3 -m http.server &> "${SERVER_LOGS}" &   # start http server on port 8000
 
 sleep 10
 
+echo "$(date +"%H-%M-%S-%6N") - test started " > "${LOGS_FULL_PATH}/general.log"
+echo -e "Params:\nVUS: ${VUS}\nSTRESS_DURATION: ${STRESS_DURATION}\nLOGS_PATH: ${LOGS_PATH}" >> "${LOGS_FULL_PATH}/general.log"
 __run_on_ue_fg "$STRESS_TEST_CMD" "$STRESS_TEST_LOG"
 
 __stop_gnb
